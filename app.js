@@ -1340,7 +1340,7 @@ function procesarPago() {
     </div>
     
     <div class="text-center mt-1">
-      <div class="border-top">¡Gracias por su visita!</div>
+      <div class="border-top">Emil Jiménez - Desarrollador Web</div>
     </div>
 
     <div class="botones-impresion">
@@ -1544,7 +1544,7 @@ function reimprimirFactura(ventaId) {
           </div>
           
           <div class="text-center mt-1">
-            <div class="border-top">¡Gracias por su visita!</div>
+            <div class="border-top">Emil Jiménez - Desarrollador Web</div>
           </div>
         </body>
       </html>
