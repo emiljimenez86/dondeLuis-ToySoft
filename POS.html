@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POS Donde Luis Restaurante</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0dcaf0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ToySoft POS">
+  <meta name="application-name" content="ToySoft POS">
+  <meta name="msapplication-TileColor" content="#0dcaf0">
+  <meta name="msapplication-TileImage" content="./image/logo-ToySoft.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./image/logo-ToySoft.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./image/logo-ToySoft.png">
+  <link rel="apple-touch-icon" href="./image/logo-ToySoft.png">
+  <style>
+    .mesa-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin: 10px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mesa-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(145deg, rgba(255,255,255,0.2), rgba(255,255,255,0));
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+
+    .mesa-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .mesa-btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .mesa-activa {
+      background-color: #ff8c00;
+      border: 3px solid #ff8c00;
+      color: white;
+    }
+
+    .mesa-domicilio {
+      background-color: #4CAF50;
+      border: 3px solid #4CAF50;
+      color: white;
+    }
+
+    .mesa-recoger {
+      background-color: #2196F3;
+      border: 3px solid #2196F3;
+      color: white;
+    }
+
+    .mesa-seleccionada {
+      background-color: #ff4500;
+      border: 3px solid #ff4500;
+      color: white;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), 0 8px 16px rgba(0, 0, 0, 0.3);
+      transform: scale(1.05);
+    }
+
+    .mesa-seleccionada::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.1);
+        opacity: 0.5;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .mesa-numero {
+      font-size: 1.2em;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    .mesa-btn i {
+      font-size: 1.5rem;
+    }
+    .mesa-btn .mesa-numero {
+      font-size: 0.8rem;
+      position: absolute;
+      bottom: 5px;
+    }
+    .mesas-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 20px;
+    }
+    .acciones-mesa {
+      display: none;
+      margin-top: 20px;
+    }
+    .acciones-mesa.visible {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body class="bg-dark text-white">
+  <script src="seguridad.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      verificarAcceso();
+    });
+  </script>
+  <div class="container-fluid py-3">
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
+          <h1 class="mb-3 mb-md-0">POS Donde Luis Restaurante</h1>
+          <div class="d-flex gap-2">
+            <a href="historial.html" class="btn btn-info">
+              <i class="fas fa-history"></i> Historial
+            </a>
+            <a href="gastos.html" class="btn btn-warning">Gastos Diarios</a>
+            <button class="btn btn-outline-info" onclick="mostrarModalCierreDiario()">
+              <i class="fas fa-calculator"></i> Cierre Diario
+            </button>
+            <a href="index.html" class="btn btn-outline-light">Volver al Inicio</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sección de Mesas Activas -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card bg-dark">
+          <div class="card-body">
+            <h4 class="text-info mb-3">Mesas Activas</h4>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div class="input-group" style="max-width: 300px;">
+                <input type="number" id="nuevaMesa" class="form-control bg-dark text-white border-light" 
+                       placeholder="N° de mesa" min="1">
+                <button class="btn btn-warning" onclick="crearNuevaMesa()">
+                  <i class="fas fa-plus"></i> Nueva Mesa
+                </button>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-success" onclick="crearPedidoDomicilio()">
+                  <i class="fas fa-motorcycle"></i> Domicilio
+                </button>
+                <button class="btn btn-primary" onclick="crearPedidoRecoger()">
+                  <i class="fas fa-shopping-bag"></i> Recoger
+                </button>
+              </div>
+            </div>
+            <div class="mesas-container" id="mesasContainer">
+              <!-- Los botones de mesas se generarán dinámicamente -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Categorías a la izquierda -->
+      <div class="col-12 col-lg-3">
+        <div class="card bg-dark">
+          <div class="card-body">
+            <h4 class="text-info mb-3">Categorías</h4>
+            <div id="categorias" class="d-grid gap-2"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orden actual en el centro -->
+      <div class="col-12 col-lg-9">
+        <div class="card bg-dark">
+          <div class="card-body">
+            <h4 class="text-info mb-3">Orden Actual - Mesa <span id="mesaActual">-</span></h4>
+            <div class="table-responsive">
+              <table class="table table-bordered table-dark table-striped" id="ordenTabla">
+                <thead class="table-secondary text-dark">
+                  <tr>
+                    <th>Producto</th>
+                    <th>Cant</th>
+                    <th>Precio</th>
+                    <th>Total</th>
+                    <th>Detalles</th>
+                    <th>Eliminar</th>
+                  </tr>
+                </thead>
+                <tbody id="ordenCuerpo"></tbody>
+              </table>
+            </div>
+
+            <div class="row g-3 mt-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-bold">Propina</label>
+                <input type="number" id="propina" class="form-control bg-dark text-white border-light" 
+                       min="0" max="100" placeholder="Ej: 10 para 10% de propina" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-bold">Descuento</label>
+                <input type="number" id="descuento" class="form-control bg-dark text-white border-light" 
+                       min="0" placeholder="Ej: 5000 para $5000 de descuento" />
+              </div>
+            </div>
+
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4">
+              <div>
+                <h5 class="mb-3 mb-md-0">Total: <span id="totalOrden">$0</span></h5>
+                <div id="desgloseTotal" class="small text-muted"></div>
+              </div>
+              <div class="d-flex gap-2 mt-3 mt-md-0">
+                <button class="btn btn-danger" onclick="eliminarPedido()">
+                  <i class="fas fa-trash"></i> Eliminar Pedido
+                </button>
+                <button class="btn btn-primary" onclick="enviarACocina()">
+                  <i class="fas fa-utensils"></i> Enviar a Cocina
+                </button>
+                <button class="btn btn-success" onclick="mostrarModalPago()">
+                  <i class="fas fa-receipt"></i> Generar Recibo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Cliente -->
+  <div class="modal fade" id="modalCliente" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content bg-dark text-white">
+        <div class="modal-header">
+          <h5 class="modal-title">Seleccionar Cliente</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6>Buscar Cliente</h6>
+              <button class="btn btn-sm btn-outline-light" onclick="mostrarFormularioNuevoCliente()">
+                <i class="fas fa-plus"></i> Nuevo Cliente
+              </button>
+            </div>
+            <form onsubmit="event.preventDefault(); buscarClientes();" class="mb-3">
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control bg-dark text-white border-light" 
+                       id="buscarCliente" placeholder="Buscar por nombre o teléfono...">
+                <button class="btn btn-outline-light btn-sm" type="submit">
+                  <i class="fas fa-search fa-sm"></i>
+                </button>
+              </div>
+            </form>
+            <div class="list-group bg-dark" id="listaClientes">
+              <!-- Los clientes se cargarán dinámicamente -->
+            </div>
+          </div>
+          
+          <div id="formularioNuevoCliente" style="display: none;">
+            <h6 class="mb-3">Nuevo Cliente</h6>
+            <div class="mb-3">
+              <label class="form-label">Nombre</label>
+              <input type="text" class="form-control bg-dark text-white border-light" id="nuevoClienteNombre">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Teléfono</label>
+              <input type="tel" class="form-control bg-dark text-white border-light" id="nuevoClienteTelefono">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Dirección</label>
+              <input type="text" class="form-control bg-dark text-white border-light" id="nuevoClienteDireccion">
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+              <button class="btn btn-secondary" onclick="ocultarFormularioNuevoCliente()">Cancelar</button>
+              <button class="btn btn-primary" onclick="guardarNuevoCliente()">Guardar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Pago -->
+  <div class="modal fade" id="modalPago" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content bg-dark text-white">
+        <div class="modal-header">
+          <h5 class="modal-title">Procesar Pago</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Sección de Clientes -->
+          <div class="mb-3">
+            <h6>Buscar Cliente (Opcional)</h6>
+            <form onsubmit="event.preventDefault(); buscarClientesPago();" class="mb-3">
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control bg-dark text-white border-light" 
+                       id="buscarClientePago" placeholder="Buscar por nombre o teléfono...">
+                <button class="btn btn-outline-light btn-sm" type="submit">
+                  <i class="fas fa-search fa-sm"></i>
+                </button>
+              </div>
+            </form>
+            <div id="listaClientesPago" class="list-group">
+              <!-- Los clientes se cargarán aquí -->
+            </div>
+          </div>
+
+          <!-- Sección de Totales -->
+          <div id="totalesSection" class="mb-3">
+            <div class="border-top border-light pt-2">
+              <div class="d-flex justify-content-between mb-1">
+                <span>Subtotal:</span>
+                <span id="subtotalModal">$ 0</span>
+              </div>
+              <div class="d-flex justify-content-between mb-1">
+                <span>Propina (0%):</span>
+                <span id="propinaModal">$ 0</span>
+              </div>
+              <div class="d-flex justify-content-between mb-1">
+                <span>Descuento:</span>
+                <span id="descuentoModal">$ 0</span>
+              </div>
+              <div class="d-flex justify-content-between mb-1 fw-bold">
+                <span>Total:</span>
+                <span id="totalModal">$ 0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Método de Pago -->
+          <div class="mb-3">
+            <label class="form-label">Método de Pago</label>
+            <select id="metodoPago" class="form-select bg-dark text-white border-light">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </div>
+
+          <!-- Sección de Efectivo -->
+          <div id="efectivoSection" class="mb-3">
+            <div class="mb-3">
+              <label class="form-label">Monto Recibido</label>
+              <input type="number" id="montoRecibido" class="form-control bg-dark text-white border-light">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Devolver en efectivo</label>
+              <div id="cambio" class="form-control bg-dark text-white border-light">$ 0</div>
+            </div>
+          </div>
+
+          <!-- Sección de Transferencia -->
+          <div id="transferenciaSection" class="mb-3" style="display: none;">
+            <div class="mb-3">
+              <label class="form-label">Número de Transferencia</label>
+              <input type="text" id="numeroTransferencia" class="form-control bg-dark text-white border-light">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="procesarPago()">Confirmar Pago</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Cierre Diario -->
+  <div class="modal fade" id="modalCierreDiario" tabindex="-1" aria-labelledby="modalCierreDiarioLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content bg-dark text-white">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalCierreDiarioLabel">Cierre Diario</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <h6>Resumen de Ventas</h6>
+            <div>Total Ventas: <span id="totalVentasHoy">$ 0</span></div>
+            <div>Efectivo: <span id="totalEfectivoHoy">$ 0</span></div>
+            <div>Transferencia: <span id="totalTransferenciaHoy">$ 0</span></div>
+          </div>
+          
+          <div class="mb-3">
+            <h6>Gastos del Día</h6>
+            <div>Total Gastos: <span id="totalGastosHoy">$ 0</span></div>
+            <button class="btn btn-info mt-2" onclick="mostrarModalGastos()">
+              <i class="fas fa-receipt"></i> Gestionar Gastos
+            </button>
+          </div>
+          
+          <div class="mb-3">
+            <h6>Balance Final</h6>
+            <div>Balance: <span id="balanceFinal">$ 0</span></div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Detalles Adicionales</label>
+            <textarea class="form-control bg-dark text-white border-light" id="detallesCierre" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-info" onclick="imprimirBalanceDiario()">
+            <i class="fas fa-print"></i> Imprimir Balance
+          </button>
+          <button type="button" class="btn btn-success" onclick="exportarCierresDiariosExcel()">
+            <i class="fas fa-file-excel"></i> Exportar a Excel
+          </button>
+          <button type="button" class="btn btn-primary" onclick="guardarCierreDiario()">Guardar Cierre</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Gastos -->
+  <div class="modal fade" id="modalGastos" tabindex="-1" aria-labelledby="modalGastosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content bg-dark text-white">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalGastosLabel">Gestión de Gastos</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Formulario de Gastos -->
+          <form id="formGasto" class="mb-4">
+            <div class="row">
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <label for="descripcionGasto" class="form-label">Descripción</label>
+                  <input type="text" class="form-control bg-dark text-white border-light" id="descripcionGasto" required>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <label for="montoGasto" class="form-label">Monto</label>
+                  <input type="number" class="form-control bg-dark text-white border-light" id="montoGasto" required>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <label for="fechaGasto" class="form-label">Fecha</label>
+                  <input type="date" class="form-control bg-dark text-white border-light" id="fechaGasto" required>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-info" id="btnGuardarGasto" onclick="guardarGasto()">
+              <i class="fas fa-save"></i> Guardar Gasto
+            </button>
+          </form>
+
+          <!-- Tabla de Gastos -->
+          <div class="table-responsive">
+            <table class="table table-dark" id="tablaGastos">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Descripción</th>
+                  <th>Monto</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Los gastos se cargarán aquí -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+</body>
+</html> 
