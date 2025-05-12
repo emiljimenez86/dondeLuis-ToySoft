@@ -104,7 +104,18 @@ function cargarDatos() {
     }
 
     if (clientesGuardados) {
-      clientes = JSON.parse(clientesGuardados);
+      try {
+        clientes = JSON.parse(clientesGuardados);
+        if (!Array.isArray(clientes)) {
+          console.error('Error: clientes no es un array después de cargar');
+          clientes = [];
+        }
+      } catch (error) {
+        console.error('Error al parsear clientes:', error);
+        clientes = [];
+      }
+    } else {
+      clientes = [];
     }
 
     if (contadorDomiciliosGuardado) {
@@ -312,6 +323,14 @@ function actualizarVistaOrden(mesa) {
   const pedido = mesasActivas.get(mesa);
   console.log('Orden de la mesa:', pedido);
 
+  // Mostrar/ocultar campo de domicilio
+  const domicilioContainer = document.getElementById('domicilioContainer');
+  if (mesa.startsWith('DOM-')) {
+    domicilioContainer.style.display = 'block';
+  } else {
+    domicilioContainer.style.display = 'none';
+  }
+
   // Actualizar el título de la orden con el nombre del cliente si es domicilio o recoger
   const mesaActual = document.getElementById('mesaActual');
   if (mesa.startsWith('DOM-')) {
@@ -465,12 +484,14 @@ function actualizarTotal(mesa) {
   
   const propina = parseFloat(document.getElementById('propina').value) || 0;
   const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+  const valorDomicilio = mesa.startsWith('DOM-') ? (parseFloat(document.getElementById('valorDomicilio').value) || 0) : 0;
   
   pedido.propina = propina;
   pedido.descuento = descuento;
+  pedido.valorDomicilio = valorDomicilio;
   
   const propinaMonto = Math.round((subtotal * propina) / 100);
-  const total = Math.round(subtotal + propinaMonto - descuento);
+  const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
   
   document.getElementById('totalOrden').textContent = formatearPrecio(total);
   
@@ -481,6 +502,7 @@ function actualizarTotal(mesa) {
         <div>Subtotal: ${formatearPrecio(subtotal)}</div>
         <div>Propina (${propina}%): ${formatearPrecio(propinaMonto)}</div>
         <div>Descuento: ${formatearPrecio(descuento)}</div>
+        ${valorDomicilio > 0 ? `<div>Domicilio: ${formatearPrecio(valorDomicilio)}</div>` : ''}
       </div>
     `;
   }
@@ -772,19 +794,58 @@ function mostrarModalPago() {
   const subtotal = pedido.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
   const propina = parseFloat(document.getElementById('propina').value) || 0;
   const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+  const valorDomicilio = mesaSeleccionada.startsWith('DOM-') ? (parseFloat(document.getElementById('valorDomicilio').value) || 0) : 0;
   const propinaMonto = Math.round((subtotal * propina) / 100);
-  const total = Math.round(subtotal + propinaMonto - descuento);
+  const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
   
   // Actualizar los totales en el modal
   document.getElementById('subtotalModal').textContent = formatearPrecio(subtotal);
   document.getElementById('propinaModal').textContent = formatearPrecio(propinaMonto);
   document.getElementById('descuentoModal').textContent = formatearPrecio(descuento);
-  document.getElementById('totalModal').textContent = formatearPrecio(total);
+  
+  // Limpiar el modal de totales
+  const totalesSection = document.getElementById('totalesSection');
+  const totalElement = totalesSection.querySelector('.fw-bold').parentElement;
+  totalesSection.innerHTML = `
+    <div class="border-top border-light pt-2">
+      <div class="d-flex justify-content-between mb-1">
+        <span>Subtotal:</span>
+        <span id="subtotalModal">${formatearPrecio(subtotal)}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-1">
+        <span>Propina (${propina}%):</span>
+        <span id="propinaModal">${formatearPrecio(propinaMonto)}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-1">
+        <span>Descuento:</span>
+        <span id="descuentoModal">${formatearPrecio(descuento)}</span>
+      </div>
+      ${mesaSeleccionada.startsWith('DOM-') ? `
+        <div class="d-flex justify-content-between mb-1">
+          <span>Domicilio:</span>
+          <span id="domicilioModal">${formatearPrecio(valorDomicilio)}</span>
+        </div>
+      ` : ''}
+      <div class="d-flex justify-content-between mb-1 fw-bold">
+        <span>Total:</span>
+        <span id="totalModal">${formatearPrecio(total)}</span>
+      </div>
+    </div>
+  `;
   
   // Limpiar campos del modal
   document.getElementById('montoRecibido').value = '';
   document.getElementById('cambio').textContent = formatearPrecio(0);
   document.getElementById('numeroTransferencia').value = '';
+  
+  // Actualizar opciones de método de pago
+  const metodoPagoSelect = document.getElementById('metodoPago');
+  metodoPagoSelect.innerHTML = `
+    <option value="efectivo">Efectivo</option>
+    <option value="tarjeta">Tarjeta</option>
+    <option value="transferencia">Transferencia</option>
+    ${pedido.cliente ? `<option value="credito">Crédito</option>` : ''}
+  `;
   
   // Mostrar el modal
   const modal = new bootstrap.Modal(document.getElementById('modalPago'));
@@ -942,6 +1003,9 @@ function toggleMetodoPago() {
   } else if (metodo === 'transferencia') {
     efectivoSection.style.display = 'none';
     transferenciaSection.style.display = 'block';
+  } else if (metodo === 'credito') {
+    efectivoSection.style.display = 'none';
+    transferenciaSection.style.display = 'none';
   } else {
     efectivoSection.style.display = 'none';
     transferenciaSection.style.display = 'none';
@@ -990,12 +1054,9 @@ function guardarNuevoCliente() {
     fechaRegistro: new Date().toISOString()
   };
 
-  // Usar window.clientes para mantener consistencia con admon.js
-  if (!window.clientes) {
-    window.clientes = [];
-  }
-  window.clientes.push(nuevoCliente);
-  localStorage.setItem('clientes', JSON.stringify(window.clientes));
+  // Usar la variable global clientes
+  clientes.push(nuevoCliente);
+  guardarClientes();
   
   // Limpiar formulario
   document.getElementById('nuevoClienteNombre').value = '';
@@ -1169,12 +1230,24 @@ function procesarPago() {
     return;
   }
 
+  // Validar que haya cliente seleccionado para crédito
+  if (metodoPago === 'credito' && !pedido.cliente) {
+    alert('Debe seleccionar un cliente para realizar un pago a crédito');
+    return;
+  }
+
   // Calcular totales
   const subtotal = pedido.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
   const propina = parseFloat(document.getElementById('propina').value) || 0;
   const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+  const valorDomicilio = mesaSeleccionada.startsWith('DOM-') ? (parseFloat(document.getElementById('valorDomicilio').value) || 0) : 0;
+  
+  pedido.propina = propina;
+  pedido.descuento = descuento;
+  pedido.valorDomicilio = valorDomicilio;
+  
   const propinaMonto = Math.round((subtotal * propina) / 100);
-  const total = Math.round(subtotal + propinaMonto - descuento);
+  const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
 
   // Validar monto recibido si es efectivo
   if (metodoPago === 'efectivo') {
@@ -1197,13 +1270,14 @@ function procesarPago() {
   // Crear objeto de factura
   const factura = {
     id: Date.now(),
-    fecha: new Date().toISOString(), // Guardar fecha en formato ISO
+    fecha: new Date().toISOString(),
     mesa: mesaSeleccionada,
     items: pedido.items,
     subtotal: subtotal,
     propina: propina,
     propinaMonto: propinaMonto,
     descuento: descuento,
+    valorDomicilio: valorDomicilio,
     total: total,
     metodoPago: metodoPago,
     montoRecibido: metodoPago === 'efectivo' ? parseFloat(document.getElementById('montoRecibido').value) : 0,
@@ -1213,10 +1287,16 @@ function procesarPago() {
     direccion: pedido.direccion || null,
     horaRecoger: pedido.horaRecoger || null,
     tipo: mesaSeleccionada.startsWith('DOM-') ? 'domicilio' : 
-          mesaSeleccionada.startsWith('REC-') ? 'recoger' : 'mesa'
+          mesaSeleccionada.startsWith('REC-') ? 'recoger' : 'mesa',
+    estado: metodoPago === 'credito' ? 'pendiente' : 'pagado'
   };
 
-  console.log('Factura a guardar:', factura);
+  // Si es crédito, guardar en una lista separada de facturas pendientes
+  if (metodoPago === 'credito') {
+    const facturasPendientes = JSON.parse(localStorage.getItem('facturasPendientes') || '[]');
+    facturasPendientes.push(factura);
+    localStorage.setItem('facturasPendientes', JSON.stringify(facturasPendientes));
+  }
 
   try {
     // Asegurarse de que historialVentas esté inicializado
@@ -1328,6 +1408,7 @@ function procesarPago() {
       <div class="mb-1">Subtotal: <span class="text-right">$ ${formatearNumero(factura.subtotal)}</span></div>
       <div class="mb-1">Propina (${factura.propina}%): <span class="text-right">$ ${formatearNumero(factura.propinaMonto)}</span></div>
       <div class="mb-1">Descuento: <span class="text-right">$ ${formatearNumero(factura.descuento)}</span></div>
+      ${factura.valorDomicilio > 0 ? `<div class="mb-1">Domicilio: <span class="text-right">$ ${formatearNumero(factura.valorDomicilio)}</span></div>` : ''}
       <div class="mb-1 total-row"><strong>Total: $ ${formatearNumero(factura.total)}</strong></div>
     </div>
     
@@ -1336,6 +1417,9 @@ function procesarPago() {
       ${factura.metodoPago === 'efectivo' ? `
         <div class="mb-1">Recibido: <span class="text-right">$ ${formatearNumero(factura.montoRecibido)}</span></div>
         <div class="mb-1">Cambio: <span class="text-right">$ ${formatearNumero(factura.cambio)}</span></div>
+      ` : ''}
+      ${factura.metodoPago === 'credito' ? `
+        <div class="mb-1">Estado: Pendiente de Pago</div>
       ` : ''}
     </div>
     
@@ -1371,8 +1455,6 @@ function procesarPago() {
   
   // Cerrar modal
   bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
-  
-  alert('Pago procesado correctamente');
 }
 
 // Función para reimprimir ticket de cocina desde el historial
@@ -1532,6 +1614,7 @@ function reimprimirFactura(ventaId) {
             <div class="mb-1">Subtotal: $ ${formatearNumero(venta.subtotal)}</div>
             <div class="mb-1">Propina (${venta.propina}%): $ ${formatearNumero(venta.propinaMonto)}</div>
             <div class="mb-1">Descuento: $ ${formatearNumero(venta.descuento)}</div>
+            ${venta.valorDomicilio > 0 ? `<div class="mb-1">Domicilio: $ ${formatearNumero(venta.valorDomicilio)}</div>` : ''}
             <div class="mb-1 total-row">Total: $ ${formatearNumero(venta.total)}</div>
           </div>
           
@@ -1557,99 +1640,194 @@ function reimprimirFactura(ventaId) {
 
 // Función para mostrar el modal de cierre diario
 function mostrarModalCierreDiario() {
-    const modal = new bootstrap.Modal(document.getElementById('modalCierreDiario'));
-    
-    // Asegurarse de que historialVentas esté cargado
-    if (!historialVentas || historialVentas.length === 0) {
-        const historialGuardado = localStorage.getItem('historialVentas');
-        if (historialGuardado) {
-            historialVentas = JSON.parse(historialGuardado);
-            console.log('Historial de ventas cargado desde localStorage:', historialVentas);
-        } else {
-            historialVentas = [];
-            console.log('No se encontró historial de ventas en localStorage');
+    try {
+        console.log('Iniciando mostrarModalCierreDiario...');
+        
+        // Asegurarse de que historialVentas esté cargado
+        if (!historialVentas) {
+            const historialGuardado = localStorage.getItem('historialVentas');
+            if (historialGuardado) {
+                try {
+                    historialVentas = JSON.parse(historialGuardado);
+                    if (!Array.isArray(historialVentas)) {
+                        console.error('historialVentas no es un array:', historialVentas);
+                        historialVentas = [];
+                    }
+                } catch (error) {
+                    console.error('Error al parsear historialVentas:', error);
+                    historialVentas = [];
+                }
+            } else {
+                historialVentas = [];
+            }
         }
+        
+        // Obtener ventas del día
+        const hoy = new Date();
+        const hoyStr = hoy.toLocaleDateString();
+        
+        const ventasHoy = historialVentas.filter(v => {
+            try {
+                const fechaVenta = new Date(v.fecha);
+                return fechaVenta.toLocaleDateString() === hoyStr;
+            } catch (error) {
+                console.error('Error al procesar fecha de venta:', error);
+                return false;
+            }
+        });
+        
+        // Calcular totales
+        const totalVentas = ventasHoy.reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalEfectivo = ventasHoy.filter(v => v.metodoPago === 'efectivo')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalTransferencia = ventasHoy.filter(v => v.metodoPago === 'transferencia')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalTarjeta = ventasHoy.filter(v => v.metodoPago === 'tarjeta')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalCredito = ventasHoy.filter(v => v.metodoPago === 'credito')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        
+        // Obtener gastos del día
+        const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
+        const gastosHoy = gastos.filter(g => {
+            try {
+                return new Date(g.fecha).toLocaleDateString() === hoyStr;
+            } catch (error) {
+                console.error('Error al procesar fecha de gasto:', error);
+                return false;
+            }
+        });
+        const totalGastos = gastosHoy.reduce((sum, g) => sum + (g.monto || 0), 0);
+        
+        // Calcular balance final (solo ventas pagadas)
+        const balanceFinal = totalVentas - totalCredito - totalGastos;
+        
+        // Actualizar valores en el modal
+        document.getElementById('totalVentasHoy').textContent = `$ ${totalVentas.toLocaleString()}`;
+        document.getElementById('totalEfectivoHoy').textContent = `$ ${totalEfectivo.toLocaleString()}`;
+        document.getElementById('totalTransferenciaHoy').textContent = `$ ${totalTransferencia.toLocaleString()}`;
+        document.getElementById('totalTarjetaHoy').textContent = `$ ${totalTarjeta.toLocaleString()}`;
+        document.getElementById('totalCreditoHoy').textContent = `$ ${totalCredito.toLocaleString()}`;
+        document.getElementById('totalGastosHoy').textContent = `$ ${totalGastos.toLocaleString()}`;
+        document.getElementById('balanceFinal').textContent = `$ ${balanceFinal.toLocaleString()}`;
+        
+        // Actualizar detalles de créditos pendientes
+        const creditosPendientes = ventasHoy.filter(v => v.metodoPago === 'credito');
+        const detallesCreditos = document.getElementById('detallesCreditos');
+        if (detallesCreditos) {
+            detallesCreditos.innerHTML = creditosPendientes.map(credito => `
+                <div class="mb-2">
+                    <div>Cliente: ${credito.cliente || 'No especificado'}</div>
+                    <div>Monto: $ ${credito.total.toLocaleString()}</div>
+                    <div>Fecha: ${new Date(credito.fecha).toLocaleString()}</div>
+                </div>
+            `).join('') || '<div>No hay créditos pendientes</div>';
+        }
+        
+        // Limpiar el campo de detalles
+        document.getElementById('detallesCierre').value = '';
+        
+        // Mostrar el modal
+        const modal = new bootstrap.Modal(document.getElementById('modalCierreDiario'));
+        modal.show();
+        
+        console.log('Modal de cierre diario mostrado correctamente');
+    } catch (error) {
+        console.error('Error en mostrarModalCierreDiario:', error);
+        alert('Error al mostrar el cierre diario: ' + error.message);
     }
-    
-    // Obtener ventas del día
-    const hoy = new Date();
-    const hoyStr = hoy.toLocaleDateString();
-    console.log('Fecha actual:', hoyStr);
-    console.log('Historial de ventas completo:', historialVentas);
-    
-    const ventasHoy = historialVentas.filter(v => {
-        const fechaVenta = new Date(v.fecha);
-        const fechaVentaStr = fechaVenta.toLocaleDateString();
-        console.log('Comparando fecha venta:', fechaVentaStr, 'con fecha actual:', hoyStr);
-        return fechaVentaStr === hoyStr;
-    });
-    
-    console.log('Ventas de hoy filtradas:', ventasHoy);
-    
-    // Calcular totales
-    const totalVentas = ventasHoy.reduce((sum, v) => sum + (v.total || 0), 0);
-    const totalEfectivo = ventasHoy.filter(v => v.metodoPago === 'efectivo')
-        .reduce((sum, v) => sum + (v.total || 0), 0);
-    const totalTransferencia = ventasHoy.filter(v => v.metodoPago === 'transferencia')
-        .reduce((sum, v) => sum + (v.total || 0), 0);
-    
-    console.log('Totales calculados:', {
-        totalVentas,
-        totalEfectivo,
-        totalTransferencia
-    });
-    
-    // Obtener gastos del día
-    const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
-    const gastosHoy = gastos.filter(g => new Date(g.fecha).toLocaleDateString() === hoyStr);
-    const totalGastos = gastosHoy.reduce((sum, g) => sum + (g.monto || 0), 0);
-    
-    console.log('Gastos de hoy:', gastosHoy);
-    console.log('Total gastos:', totalGastos);
-    
-    // Calcular balance final
-    const balanceFinal = totalVentas - totalGastos;
-    
-    // Actualizar valores en el modal
-    document.getElementById('totalVentasHoy').textContent = `$ ${totalVentas.toLocaleString()}`;
-    document.getElementById('totalEfectivoHoy').textContent = `$ ${totalEfectivo.toLocaleString()}`;
-    document.getElementById('totalTransferenciaHoy').textContent = `$ ${totalTransferencia.toLocaleString()}`;
-    document.getElementById('totalGastosHoy').textContent = `$ ${totalGastos.toLocaleString()}`;
-    document.getElementById('balanceFinal').textContent = `$ ${balanceFinal.toLocaleString()}`;
-    
-    modal.show();
 }
 
 function guardarCierreDiario() {
-    const detalles = document.getElementById('detallesCierre').value;
-    const fecha = new Date().toLocaleDateString();
-    
-    // Obtener datos actuales
-    const cierres = JSON.parse(localStorage.getItem('cierresDiarios')) || [];
-    
-    // Crear nuevo cierre
-    const nuevoCierre = {
-        fecha,
-        totalVentas: parseFloat(document.getElementById('totalVentasHoy').textContent.replace('$', '').replace(',', '')),
-        totalEfectivo: parseFloat(document.getElementById('totalEfectivoHoy').textContent.replace('$', '').replace(',', '')),
-        totalTransferencia: parseFloat(document.getElementById('totalTransferenciaHoy').textContent.replace('$', '').replace(',', '')),
-        totalGastos: parseFloat(document.getElementById('totalGastosHoy').textContent.replace('$', '').replace(',', '')),
-        balanceFinal: parseFloat(document.getElementById('balanceFinal').textContent.replace('$', '').replace(',', '')),
-        detalles
-    };
-    
-    // Agregar nuevo cierre
-    cierres.push(nuevoCierre);
-    
-    // Guardar en localStorage
-    localStorage.setItem('cierresDiarios', JSON.stringify(cierres));
-    
-    // Cerrar modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('modalCierreDiario'));
-    modal.hide();
-    
-    // Mostrar mensaje de éxito
-    alert('Cierre diario guardado exitosamente');
+    try {
+        const detalles = document.getElementById('detallesCierre').value;
+        const fecha = new Date().toLocaleDateString();
+        
+        // Obtener datos actuales
+        const cierres = JSON.parse(localStorage.getItem('cierresDiarios')) || [];
+        
+        // Obtener ventas del día
+        const hoy = new Date();
+        const hoyStr = hoy.toLocaleDateString();
+        const ventasHoy = historialVentas.filter(v => {
+            try {
+                const fechaVenta = new Date(v.fecha);
+                return fechaVenta.toLocaleDateString() === hoyStr;
+            } catch (error) {
+                console.error('Error al procesar fecha de venta:', error);
+                return false;
+            }
+        });
+        
+        // Calcular totales
+        const totalVentas = ventasHoy.reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalEfectivo = ventasHoy.filter(v => v.metodoPago === 'efectivo')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalTransferencia = ventasHoy.filter(v => v.metodoPago === 'transferencia')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalTarjeta = ventasHoy.filter(v => v.metodoPago === 'tarjeta')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        const totalCredito = ventasHoy.filter(v => v.metodoPago === 'credito')
+            .reduce((sum, v) => sum + (v.total || 0), 0);
+        
+        // Obtener gastos del día
+        const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
+        const gastosHoy = gastos.filter(g => {
+            try {
+                return new Date(g.fecha).toLocaleDateString() === hoyStr;
+            } catch (error) {
+                console.error('Error al procesar fecha de gasto:', error);
+                return false;
+            }
+        });
+        const totalGastos = gastosHoy.reduce((sum, g) => sum + (g.monto || 0), 0);
+        
+        // Calcular balance final
+        const balanceFinal = totalVentas - totalCredito - totalGastos;
+        
+        // Crear nuevo cierre
+        const nuevoCierre = {
+            id: Date.now(),
+            fecha,
+            totalVentas,
+            totalEfectivo,
+            totalTransferencia,
+            totalTarjeta,
+            totalCredito,
+            totalGastos,
+            balanceFinal,
+            detalles,
+            creditosPendientes: ventasHoy.filter(v => v.metodoPago === 'credito').map(v => ({
+                cliente: v.cliente,
+                monto: v.total,
+                fecha: v.fecha
+            }))
+        };
+        
+        // Verificar si ya existe un cierre para hoy
+        const cierreExistente = cierres.findIndex(c => c.fecha === fecha);
+        if (cierreExistente !== -1) {
+            if (!confirm('Ya existe un cierre para hoy. ¿Desea sobrescribirlo?')) {
+                return;
+            }
+            cierres[cierreExistente] = nuevoCierre;
+        } else {
+            cierres.push(nuevoCierre);
+        }
+        
+        // Guardar en localStorage
+        localStorage.setItem('cierresDiarios', JSON.stringify(cierres));
+        
+        // Cerrar modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalCierreDiario'));
+        modal.hide();
+        
+        // Mostrar mensaje de éxito
+        alert('Cierre diario guardado exitosamente');
+    } catch (error) {
+        console.error('Error en guardarCierreDiario:', error);
+        alert('Error al guardar el cierre diario: ' + error.message);
+    }
 }
 
 function exportarCierresDiariosExcel() {
@@ -1717,6 +1895,10 @@ function imprimirBalanceDiario() {
             .reduce((sum, v) => sum + v.total, 0);
         const totalTransferencia = ventasHoy.filter(v => v.metodoPago === 'transferencia')
             .reduce((sum, v) => sum + v.total, 0);
+        const totalTarjeta = ventasHoy.filter(v => v.metodoPago === 'tarjeta')
+            .reduce((sum, v) => sum + v.total, 0);
+        const totalCredito = ventasHoy.filter(v => v.metodoPago === 'credito')
+            .reduce((sum, v) => sum + v.total, 0);
         
         // Obtener gastos del día
         const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
@@ -1724,7 +1906,7 @@ function imprimirBalanceDiario() {
         const totalGastos = gastosHoy.reduce((sum, g) => sum + g.monto, 0);
         
         // Calcular balance final
-        const balanceFinal = totalVentas - totalGastos;
+        const balanceFinal = totalVentas - totalCredito - totalGastos;
 
         // Crear ventana de impresión
         const ventana = obtenerVentanaImpresion();
@@ -1799,6 +1981,8 @@ function imprimirBalanceDiario() {
                         <div class="mb-1">Total Ventas: $ ${totalVentas.toLocaleString()}</div>
                         <div class="mb-1">- Efectivo: $ ${totalEfectivo.toLocaleString()}</div>
                         <div class="mb-1">- Transferencia: $ ${totalTransferencia.toLocaleString()}</div>
+                        <div class="mb-1">- Tarjeta: $ ${totalTarjeta.toLocaleString()}</div>
+                        <div class="mb-1">- Crédito: $ ${totalCredito.toLocaleString()}</div>
                     </div>
                     
                     <div class="border-top">
@@ -1814,6 +1998,13 @@ function imprimirBalanceDiario() {
                         ${gastosHoy.map(gasto => `
                             <div class="mb-1">- ${gasto.descripcion}: $ ${gasto.monto.toLocaleString()}</div>
                         `).join('')}
+                    </div>
+
+                    <div class="border-top mt-1">
+                        <div class="mb-1">Créditos Pendientes:</div>
+                        ${ventasHoy.filter(v => v.metodoPago === 'credito').map(credito => `
+                            <div class="mb-1">- ${credito.cliente || 'No especificado'}: $ ${credito.total.toLocaleString()}</div>
+                        `).join('') || '<div class="mb-1">No hay créditos pendientes</div>'}
                     </div>
                     
                     <div class="text-center mt-1">
@@ -2019,6 +2210,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   document.getElementById('descuento').addEventListener('input', () => {
+    if (mesaSeleccionada) {
+      actualizarTotal(mesaSeleccionada);
+    }
+  });
+  
+  document.getElementById('valorDomicilio').addEventListener('input', () => {
     if (mesaSeleccionada) {
       actualizarTotal(mesaSeleccionada);
     }

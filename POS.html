@@ -159,6 +159,9 @@
               <i class="fas fa-history"></i> Historial
             </a>
             <a href="gastos.html" class="btn btn-warning">Gastos Diarios</a>
+            <a href="inventario.html" class="btn btn-success">
+              <i class="fas fa-boxes"></i> Inventario
+            </a>
             <button class="btn btn-outline-info" onclick="mostrarModalCierreDiario()">
               <i class="fas fa-calculator"></i> Cierre Diario
             </button>
@@ -232,15 +235,20 @@
             </div>
 
             <div class="row g-3 mt-3">
-              <div class="col-12 col-md-6">
+              <div class="col-12 col-md-4">
                 <label class="form-label fw-bold">Propina</label>
                 <input type="number" id="propina" class="form-control bg-dark text-white border-light" 
                        min="0" max="100" placeholder="Ej: 10 para 10% de propina" />
               </div>
-              <div class="col-12 col-md-6">
+              <div class="col-12 col-md-4">
                 <label class="form-label fw-bold">Descuento</label>
                 <input type="number" id="descuento" class="form-control bg-dark text-white border-light" 
                        min="0" placeholder="Ej: 5000 para $5000 de descuento" />
+              </div>
+              <div class="col-12 col-md-4" id="domicilioContainer" style="display: none;">
+                <label class="form-label fw-bold">Valor Domicilio</label>
+                <input type="number" id="valorDomicilio" class="form-control bg-dark text-white border-light" 
+                       min="0" placeholder="Ej: 3000 para $3000 de domicilio" />
               </div>
             </div>
 
@@ -421,6 +429,8 @@
             <div>Total Ventas: <span id="totalVentasHoy">$ 0</span></div>
             <div>Efectivo: <span id="totalEfectivoHoy">$ 0</span></div>
             <div>Transferencia: <span id="totalTransferenciaHoy">$ 0</span></div>
+            <div>Tarjeta: <span id="totalTarjetaHoy">$ 0</span></div>
+            <div>Crédito: <span id="totalCreditoHoy">$ 0</span></div>
           </div>
           
           <div class="mb-3">
@@ -434,6 +444,13 @@
           <div class="mb-3">
             <h6>Balance Final</h6>
             <div>Balance: <span id="balanceFinal">$ 0</span></div>
+          </div>
+
+          <div class="mb-3">
+            <h6>Créditos Pendientes</h6>
+            <div id="detallesCreditos" class="mt-2">
+              <!-- Los créditos pendientes se mostrarán aquí -->
+            </div>
           </div>
           
           <div class="mb-3">
