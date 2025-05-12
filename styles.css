@@ -284,6 +284,12 @@ footer {
     padding: 20px;
 }
 
+/* Estilos para el titulo del restaurante */
+.nombreRestaurante { 
+    color: #0dcaf0;
+    font-family:'Montserrat',sans-serif;
+    font-weight: bold;
+}
 /* Estilos para los checkboxes */
 .form-check-input {
     width: 1.1em;
