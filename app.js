@@ -608,94 +608,109 @@ function generarTicketCocina(pedido) {
 
 // Función para obtener o crear la ventana de impresión
 function obtenerVentanaImpresion() {
-  if (!ventanaImpresion || ventanaImpresion.closed) {
-    ventanaImpresion = window.open('', 'ventanaImpresion', 'width=400,height=600');
-    if (ventanaImpresion) {
-      ventanaImpresion.document.write(`
-        <html>
-          <head>
-            <title>Impresión</title>
-            <style>
-              body { 
-                font-family: monospace;
-                font-size: 14px;
-                width: 80mm;
-                margin: 0;
-                padding: 2mm;
-              }
-              .text-center { text-align: center; }
-              .text-right { text-align: right; }
-              .mb-1 { margin-bottom: 1px; }
-              .mt-1 { margin-top: 1px; }
-              .logo-container {
-                text-align: center;
-                margin-bottom: 5px;
-              }
-              .logo-container img {
-                max-width: 100%;
-                max-height: 100px;
-                object-fit: contain;
-                image-rendering: -webkit-optimize-contrast;
-                image-rendering: crisp-edges;
-              }
-              table { 
-                width: 100%;
-                border-collapse: collapse;
-                margin: 2px 0;
-              }
-              th, td { 
-                padding: 1px;
-                text-align: left;
-                font-size: 14px;
-              }
-              .border-top { 
-                border-top: 1px dashed #000;
-                margin-top: 2px;
-                padding-top: 2px;
-              }
-              .header {
-                border-bottom: 1px dashed #000;
-                padding-bottom: 2px;
-                margin-bottom: 2px;
-              }
-              .total-row {
-                font-weight: bold;
-                font-size: 15px;
-              }
-              .botones-impresion {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                z-index: 1000;
-              }
-              .botones-impresion button {
-                margin-left: 5px;
-                padding: 5px 10px;
-                background: #007bff;
-                color: white;
-                border: none;
-                border-radius: 3px;
-                cursor: pointer;
-              }
-              .botones-impresion button:hover {
-                background: #0056b3;
-              }
-              @media print {
-                .botones-impresion {
-                  display: none;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            <div id="contenido"></div>
-          </body>
-        </html>
-      `);
-      ventanaImpresion.document.close();
-    }
-  }
-  return ventanaImpresion;
+  const ventana = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+  if (!ventana) return null;
+
+  // Esperar a que la ventana esté completamente cargada
+  ventana.document.open();
+  ventana.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Recibo</title>
+        <meta charset="UTF-8">
+        <style>
+          body { 
+            font-family: monospace;
+            font-size: 12px;
+            width: 57mm;
+            margin: 0;
+            padding: 1mm;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .mb-1 { margin-bottom: 0.5mm; }
+          .mt-1 { margin-top: 0.5mm; }
+          table { 
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1mm 0;
+            font-size: 12px;
+          }
+          th, td { 
+            padding: 0.5mm;
+            text-align: left;
+            font-size: 12px;
+          }
+          .border-top { 
+            border-top: 1px dashed #000;
+            margin-top: 1mm;
+            padding-top: 1mm;
+          }
+          .header {
+            border-bottom: 1px dashed #000;
+            padding-bottom: 1mm;
+            margin-bottom: 1mm;
+          }
+          .total-row {
+            font-weight: bold;
+            font-size: 13px;
+          }
+          .botones-impresion {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+          }
+          .botones-impresion button {
+            margin: 0 5px;
+            padding: 5px 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+          }
+          .botones-impresion button:hover {
+            background: #0056b3;
+          }
+          .logo-container {
+            text-align: center;
+            margin-bottom: 2mm;
+          }
+          .logo-container img {
+            max-width: 100%;
+            max-height: 80px;
+          }
+          @media print {
+            .botones-impresion {
+              display: none;
+            }
+            @page {
+              margin: 0;
+              size: 57mm auto;
+            }
+            body {
+              width: 57mm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="botones-impresion">
+          <button onclick="window.print()">Imprimir</button>
+          <button onclick="window.close()">Cerrar</button>
+        </div>
+        <div id="contenido"></div>
+      </body>
+    </html>
+  `);
+  ventana.document.close();
+  return ventana;
 }
 
 // Función para imprimir ticket de cocina
@@ -776,84 +791,89 @@ function imprimirTicketCocina(mesa, productos) {
 
 // Función para mostrar el modal de pago
 function mostrarModalPago() {
-  if (!mesaSeleccionada || !mesasActivas.has(mesaSeleccionada)) {
-    alert('Por favor, seleccione una mesa con productos');
-    return;
-  }
+  // Primero generar el recibo preliminar
+  generarReciboPreliminar();
 
-  const pedido = mesasActivas.get(mesaSeleccionada);
-  if (!pedido || !pedido.items || pedido.items.length === 0) {
-    alert('No hay productos para generar recibo');
-    return;
-  }
+  // Esperar a que el usuario cierre la ventana del recibo preliminar antes de mostrar el modal de pago
+  setTimeout(() => {
+    if (!mesaSeleccionada || !mesasActivas.has(mesaSeleccionada)) {
+      alert('Por favor, seleccione una mesa con productos');
+      return;
+    }
 
-  // Actualizar la lista de clientes
-  actualizarListaClientesPago();
-  
-  // Calcular totales
-  const subtotal = pedido.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-  const propina = parseFloat(document.getElementById('propina').value) || 0;
-  const descuento = parseFloat(document.getElementById('descuento').value) || 0;
-  const valorDomicilio = mesaSeleccionada.startsWith('DOM-') ? (parseFloat(document.getElementById('valorDomicilio').value) || 0) : 0;
-  const propinaMonto = Math.round((subtotal * propina) / 100);
-  const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
-  
-  // Actualizar los totales en el modal
-  document.getElementById('subtotalModal').textContent = formatearPrecio(subtotal);
-  document.getElementById('propinaModal').textContent = formatearPrecio(propinaMonto);
-  document.getElementById('descuentoModal').textContent = formatearPrecio(descuento);
-  
-  // Limpiar el modal de totales
-  const totalesSection = document.getElementById('totalesSection');
-  const totalElement = totalesSection.querySelector('.fw-bold').parentElement;
-  totalesSection.innerHTML = `
-    <div class="border-top border-light pt-2">
-      <div class="d-flex justify-content-between mb-1">
-        <span>Subtotal:</span>
-        <span id="subtotalModal">${formatearPrecio(subtotal)}</span>
-      </div>
-      <div class="d-flex justify-content-between mb-1">
-        <span>Propina (${propina}%):</span>
-        <span id="propinaModal">${formatearPrecio(propinaMonto)}</span>
-      </div>
-      <div class="d-flex justify-content-between mb-1">
-        <span>Descuento:</span>
-        <span id="descuentoModal">${formatearPrecio(descuento)}</span>
-      </div>
-      ${mesaSeleccionada.startsWith('DOM-') ? `
+    const pedido = mesasActivas.get(mesaSeleccionada);
+    if (!pedido || !pedido.items || pedido.items.length === 0) {
+      alert('No hay productos para generar recibo');
+      return;
+    }
+
+    // Actualizar la lista de clientes
+    actualizarListaClientesPago();
+    
+    // Calcular totales
+    const subtotal = pedido.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+    const propina = parseFloat(document.getElementById('propina').value) || 0;
+    const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+    const valorDomicilio = mesaSeleccionada.startsWith('DOM-') ? (parseFloat(document.getElementById('valorDomicilio').value) || 0) : 0;
+    const propinaMonto = Math.round((subtotal * propina) / 100);
+    const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
+
+    // Actualizar los totales en el modal
+    document.getElementById('subtotalModal').textContent = formatearPrecio(subtotal);
+    document.getElementById('propinaModal').textContent = formatearPrecio(propinaMonto);
+    document.getElementById('descuentoModal').textContent = formatearPrecio(descuento);
+    
+    // Limpiar el modal de totales
+    const totalesSection = document.getElementById('totalesSection');
+    totalesSection.innerHTML = `
+      <div class="border-top border-light pt-2">
         <div class="d-flex justify-content-between mb-1">
-          <span>Domicilio:</span>
-          <span id="domicilioModal">${formatearPrecio(valorDomicilio)}</span>
+          <span>Subtotal:</span>
+          <span id="subtotalModal">${formatearPrecio(subtotal)}</span>
         </div>
-      ` : ''}
-      <div class="d-flex justify-content-between mb-1 fw-bold">
-        <span>Total:</span>
-        <span id="totalModal">${formatearPrecio(total)}</span>
+        <div class="d-flex justify-content-between mb-1">
+          <span>Propina (${propina}%):</span>
+          <span id="propinaModal">${formatearPrecio(propinaMonto)}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-1">
+          <span>Descuento:</span>
+          <span id="descuentoModal">${formatearPrecio(descuento)}</span>
+        </div>
+        ${mesaSeleccionada.startsWith('DOM-') ? `
+          <div class="d-flex justify-content-between mb-1">
+            <span>Domicilio:</span>
+            <span id="domicilioModal">${formatearPrecio(valorDomicilio)}</span>
+          </div>
+        ` : ''}
+        <div class="d-flex justify-content-between mb-1 fw-bold">
+          <span>Total:</span>
+          <span id="totalModal">${formatearPrecio(total)}</span>
+        </div>
       </div>
-    </div>
-  `;
-  
-  // Limpiar campos del modal
-  document.getElementById('montoRecibido').value = '';
-  document.getElementById('cambio').textContent = formatearPrecio(0);
-  document.getElementById('numeroTransferencia').value = '';
-  
-  // Actualizar opciones de método de pago
-  const metodoPagoSelect = document.getElementById('metodoPago');
-  metodoPagoSelect.innerHTML = `
-    <option value="efectivo">Efectivo</option>
-    <option value="tarjeta">Tarjeta</option>
-    <option value="transferencia">Transferencia</option>
-    ${pedido.cliente ? `<option value="credito">Crédito</option>` : ''}
-  `;
-  
-  // Mostrar el modal
-  const modal = new bootstrap.Modal(document.getElementById('modalPago'));
-  modal.show();
+    `;
+    
+    // Limpiar campos del modal
+    document.getElementById('montoRecibido').value = '';
+    document.getElementById('cambio').textContent = formatearPrecio(0);
+    document.getElementById('numeroTransferencia').value = '';
+    
+    // Actualizar opciones de método de pago
+    const metodoPagoSelect = document.getElementById('metodoPago');
+    metodoPagoSelect.innerHTML = `
+      <option value="efectivo">Efectivo</option>
+      <option value="tarjeta">Tarjeta</option>
+      <option value="transferencia">Transferencia</option>
+      <option value="credito">Crédito</option>
+    `;
+    
+    // Mostrar el modal después de imprimir el recibo preliminar
+    const modal = new bootstrap.Modal(document.getElementById('modalPago'));
+    modal.show();
 
-  // Agregar event listeners
-  document.getElementById('montoRecibido').addEventListener('input', calcularCambio);
-  document.getElementById('metodoPago').addEventListener('change', toggleMetodoPago);
+    // Agregar event listeners
+    document.getElementById('montoRecibido').addEventListener('input', calcularCambio);
+    document.getElementById('metodoPago').addEventListener('change', toggleMetodoPago);
+  }, 500); // Dar tiempo para que el usuario vea el recibo preliminar
 }
 
 // Función para actualizar la lista de clientes
@@ -953,6 +973,15 @@ function seleccionarClientePago(cliente) {
     pedido.direccion = cliente.direccion;
     guardarMesas();
     
+    // Actualizar opciones de método de pago para incluir crédito
+    const metodoPagoSelect = document.getElementById('metodoPago');
+    metodoPagoSelect.innerHTML = `
+      <option value="efectivo">Efectivo</option>
+      <option value="tarjeta">Tarjeta</option>
+      <option value="transferencia">Transferencia</option>
+      <option value="credito">Crédito</option>
+    `;
+    
     // Mostrar mensaje de confirmación
     const mensaje = document.createElement('div');
     mensaje.className = 'alert alert-success mt-2';
@@ -969,26 +998,25 @@ function seleccionarClientePago(cliente) {
 // Función para calcular el cambio
 function calcularCambio() {
   const montoRecibido = parseFloat(document.getElementById('montoRecibido').value) || 0;
-  const totalText = document.getElementById('totalModal').textContent;
-  // Extraer solo los números del texto del total
-  const total = parseFloat(totalText.replace(/[^\d]/g, '')) || 0;
+  const totalElement = document.getElementById('totalModal');
+  // Eliminar el símbolo de moneda y los separadores de miles, y convertir a número
+  const total = parseFloat(totalElement.textContent.replace(/[$.]/g, '').replace(/,/g, ''));
+  const cambio = montoRecibido - total;
   
-  // Asegurarnos de que ambos números sean válidos
-  if (isNaN(montoRecibido) || isNaN(total)) {
-    document.getElementById('cambio').textContent = 'Devolver en efectivo: $0';
-    return;
+  const cambioElement = document.getElementById('cambio');
+  if (cambio >= 0) {
+    cambioElement.textContent = formatearPrecio(cambio);
+    cambioElement.classList.remove('text-danger', 'bg-danger');
+    cambioElement.classList.add('text-success', 'bg-light');
+    cambioElement.style.fontWeight = 'bold';
+    cambioElement.style.fontSize = '1.2em';
+  } else {
+    cambioElement.textContent = 'Monto insuficiente';
+    cambioElement.classList.remove('text-success', 'bg-light');
+    cambioElement.classList.add('text-danger', 'bg-danger');
+    cambioElement.style.fontWeight = 'bold';
+    cambioElement.style.fontSize = '1.2em';
   }
-  
-  // Calcular la diferencia
-  const devolver = montoRecibido - total;
-  
-  // Mostrar el resultado
-  document.getElementById('cambio').textContent = `Devolver en efectivo: ${formatearPrecio(devolver)}`;
-  
-  // Para depuración
-  console.log('Monto recibido:', montoRecibido);
-  console.log('Total:', total);
-  console.log('Devolver:', devolver);
 }
 
 // Función para alternar entre métodos de pago
@@ -1241,31 +1269,8 @@ function procesarPago() {
   const propina = parseFloat(document.getElementById('propina').value) || 0;
   const descuento = parseFloat(document.getElementById('descuento').value) || 0;
   const valorDomicilio = mesaSeleccionada.startsWith('DOM-') ? (parseFloat(document.getElementById('valorDomicilio').value) || 0) : 0;
-  
-  pedido.propina = propina;
-  pedido.descuento = descuento;
-  pedido.valorDomicilio = valorDomicilio;
-  
   const propinaMonto = Math.round((subtotal * propina) / 100);
   const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
-
-  // Validar monto recibido si es efectivo
-  if (metodoPago === 'efectivo') {
-    const montoRecibido = parseFloat(document.getElementById('montoRecibido').value);
-    if (!montoRecibido || montoRecibido < total) {
-      alert('El monto recibido es insuficiente');
-      return;
-    }
-  }
-
-  // Validar número de transferencia si es transferencia
-  if (metodoPago === 'transferencia') {
-    const numeroTransferencia = document.getElementById('numeroTransferencia').value;
-    if (!numeroTransferencia) {
-      alert('Por favor, ingrese el número de transferencia');
-      return;
-    }
-  }
 
   // Crear objeto de factura
   const factura = {
@@ -1298,75 +1303,48 @@ function procesarPago() {
     localStorage.setItem('facturasPendientes', JSON.stringify(facturasPendientes));
   }
 
-  try {
-    // Asegurarse de que historialVentas esté inicializado
-    if (!historialVentas) {
-      historialVentas = [];
-    }
-
-    // Verificar que historialVentas sea un array
-    if (!Array.isArray(historialVentas)) {
-      console.error('historialVentas no es un array:', historialVentas);
-      historialVentas = [];
-    }
-
-    // Agregar al historial de ventas
-    historialVentas.push(factura);
-    console.log('Historial de ventas actualizado:', historialVentas);
-    
-    // Guardar en localStorage
-    guardarHistorialVentas();
-    console.log('Historial de ventas guardado en localStorage');
-
-    // Verificar que se guardó correctamente
-    const guardado = localStorage.getItem('historialVentas');
-    console.log('Verificación de guardado:', guardado);
-  } catch (error) {
-    console.error('Error al guardar la venta:', error);
-    alert('Error al guardar la venta. Por favor, intente nuevamente.');
-    return;
+  // Agregar al historial de ventas
+  if (!Array.isArray(historialVentas)) {
+    historialVentas = [];
   }
+  historialVentas.push(factura);
+  guardarHistorialVentas();
 
-  // Imprimir factura
+  // Obtener la ventana de impresión
   const ventana = obtenerVentanaImpresion();
   if (!ventana) {
     alert('No se pudo abrir la ventana de impresión. Por favor, verifique que los bloqueadores de ventanas emergentes estén desactivados.');
     return;
   }
-  
+
   let tipoPedido = '';
   let infoAdicional = '';
-  
-  if (factura.mesa.startsWith('DOM-')) {
+
+  if (mesaSeleccionada.startsWith('DOM-')) {
     tipoPedido = 'Pedido a Domicilio';
-    if (factura.cliente) {
+    if (pedido.cliente) {
       infoAdicional = `
         <div class="border-top">
-          <div class="mb-1">Cliente: ${factura.cliente}</div>
-          <div class="mb-1">Dir: ${factura.direccion}</div>
-          <div class="mb-1">Tel: ${factura.telefono}</div>
+          <div class="mb-1">Cliente: ${pedido.cliente}</div>
+          <div class="mb-1">Dir: ${pedido.direccion || 'No especificada'}</div>
+          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
         </div>
       `;
     }
-  } else if (factura.mesa.startsWith('REC-')) {
+  } else if (mesaSeleccionada.startsWith('REC-')) {
     tipoPedido = 'Pedido para Recoger';
-    if (factura.cliente) {
+    if (pedido.cliente) {
       infoAdicional = `
         <div class="border-top">
-          <div class="mb-1">Cliente: ${factura.cliente}</div>
-          <div class="mb-1">Tel: ${factura.telefono}</div>
-          <div class="mb-1">Hora: ${factura.horaRecoger}</div>
+          <div class="mb-1">Cliente: ${pedido.cliente}</div>
+          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
+          <div class="mb-1">Hora: ${pedido.horaRecoger || 'No especificada'}</div>
         </div>
       `;
     }
   }
 
-  const formatearNumero = (num) => {
-    const numero = Math.round(num);
-    return numero.toLocaleString('es-CO');
-  };
-  
-  const contenido = `
+  const contenidoRecibo = `
     <div class="logo-container">
       ${localStorage.getItem('logoNegocio') ? 
         `<img src="${localStorage.getItem('logoNegocio')}" alt="Logo">` : 
@@ -1376,9 +1354,9 @@ function procesarPago() {
     <div class="header text-center">
       <h2 style="margin: 0; font-size: 14px;">RESTAURANTE</h2>
       ${tipoPedido ? `<div class="mb-1">${tipoPedido}</div>` : ''}
-      <div class="mb-1">${factura.fecha}</div>
-      ${!factura.mesa.startsWith('DOM-') && !factura.mesa.startsWith('REC-') ? 
-        `<div class="mb-1">Mesa: ${factura.mesa}</div>` : ''}
+      <div class="mb-1">${new Date().toLocaleString()}</div>
+      ${!mesaSeleccionada.startsWith('DOM-') && !mesaSeleccionada.startsWith('REC-') ? 
+        `<div class="mb-1">Mesa: ${mesaSeleccionada}</div>` : ''}
     </div>
     
     ${infoAdicional}
@@ -1393,9 +1371,9 @@ function procesarPago() {
         </tr>
       </thead>
       <tbody>
-        ${factura.items.map(item => `
+        ${pedido.items.map(item => `
           <tr>
-            <td><strong>${item.nombre}</strong></td>
+            <td>${item.nombre}</td>
             <td>${item.cantidad}</td>
             <td class="text-right">${formatearNumero(item.precio)}</td>
             <td class="text-right">${formatearNumero(item.precio * item.cantidad)}</td>
@@ -1405,56 +1383,56 @@ function procesarPago() {
     </table>
     
     <div class="border-top">
-      <div class="mb-1">Subtotal: <span class="text-right">$ ${formatearNumero(factura.subtotal)}</span></div>
-      <div class="mb-1">Propina (${factura.propina}%): <span class="text-right">$ ${formatearNumero(factura.propinaMonto)}</span></div>
-      <div class="mb-1">Descuento: <span class="text-right">$ ${formatearNumero(factura.descuento)}</span></div>
-      ${factura.valorDomicilio > 0 ? `<div class="mb-1">Domicilio: <span class="text-right">$ ${formatearNumero(factura.valorDomicilio)}</span></div>` : ''}
-      <div class="mb-1 total-row"><strong>Total: $ ${formatearNumero(factura.total)}</strong></div>
+      <div class="mb-1">Subtotal: <span class="text-right">$ ${formatearNumero(subtotal)}</span></div>
+      <div class="mb-1">Propina (${propina}%): <span class="text-right">$ ${formatearNumero(propinaMonto)}</span></div>
+      <div class="mb-1">Descuento: <span class="text-right">$ ${formatearNumero(descuento)}</span></div>
+      ${valorDomicilio > 0 ? `<div class="mb-1">Domicilio: <span class="text-right">$ ${formatearNumero(valorDomicilio)}</span></div>` : ''}
+      <div class="mb-1 total-row"><strong>Total: $ ${formatearNumero(total)}</strong></div>
     </div>
     
     <div class="border-top">
-      <div class="mb-1">Pago: ${factura.metodoPago}</div>
-      ${factura.metodoPago === 'efectivo' ? `
-        <div class="mb-1">Recibido: <span class="text-right">$ ${formatearNumero(factura.montoRecibido)}</span></div>
-        <div class="mb-1">Cambio: <span class="text-right">$ ${formatearNumero(factura.cambio)}</span></div>
+      <div class="mb-1">Método de Pago: ${metodoPago}</div>
+      ${metodoPago === 'efectivo' ? `
+        <div class="mb-1">Recibido: $ ${formatearNumero(factura.montoRecibido)}</div>
+        <div class="mb-1">Cambio: $ ${formatearNumero(factura.cambio)}</div>
       ` : ''}
-      ${factura.metodoPago === 'credito' ? `
-        <div class="mb-1">Estado: Pendiente de Pago</div>
+      ${metodoPago === 'transferencia' ? `
+        <div class="mb-1">N° Transferencia: ${document.getElementById('numeroTransferencia').value}</div>
       ` : ''}
     </div>
     
     <div class="text-center mt-1">
+      <div class="border-top">¡Gracias por su compra!</div>
       <div class="border-top">Emil Jiménez - Desarrollador Web</div>
     </div>
-
-    <div class="botones-impresion">
-      <button onclick="window.print()">Imprimir</button>
-      <button onclick="window.close()">Cerrar</button>
-    </div>
   `;
-  
-  ventana.document.getElementById('contenido').innerHTML = contenido;
-  ventana.focus();
 
-  // Limpiar la mesa
+  // Esperar a que el documento esté listo
+  setTimeout(() => {
+    const contenidoDiv = ventana.document.getElementById('contenido');
+    if (contenidoDiv) {
+      contenidoDiv.innerHTML = contenidoRecibo;
+      ventana.focus();
+    }
+  }, 100);
+
+  // Cerrar el modal de pago
+  bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+
+  // Eliminar la mesa/pedido
   mesasActivas.delete(mesaSeleccionada);
-  ordenesCocina.delete(mesaSeleccionada);
   guardarMesas();
+  actualizarMesasActivas();
   
-  // Limpiar la interfaz
+  // Limpiar la vista actual
   document.getElementById('ordenCuerpo').innerHTML = '';
   document.getElementById('propina').value = '';
   document.getElementById('descuento').value = '';
-  document.getElementById('totalOrden').textContent = formatearPrecio(0);
+  document.getElementById('valorDomicilio').value = '';
+  document.getElementById('totalOrden').textContent = '$ 0';
   document.getElementById('desgloseTotal').innerHTML = '';
   document.getElementById('mesaActual').textContent = '-';
   mesaSeleccionada = null;
-  
-  // Actualizar vista de mesas
-  actualizarMesasActivas();
-  
-  // Cerrar modal
-  bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
 }
 
 // Función para reimprimir ticket de cocina desde el historial
@@ -1509,47 +1487,52 @@ function reimprimirFactura(ventaId) {
           <style>
             body { 
               font-family: monospace;
-              font-size: 14px;
-              width: 80mm;
+              font-size: 12px;
+              width: 57mm;
               margin: 0;
-              padding: 2mm;
+              padding: 1mm;
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
-            .mb-1 { margin-bottom: 1px; }
-            .mt-1 { margin-top: 1px; }
+            .mb-1 { margin-bottom: 0.5mm; }
+            .mt-1 { margin-top: 0.5mm; }
             table { 
               width: 100%;
               border-collapse: collapse;
-              margin: 2px 0;
+              margin: 1mm 0;
+              font-size: 12px;
             }
             th, td { 
-              padding: 1px;
+              padding: 0.5mm;
               text-align: left;
-              font-size: 14px;
+              font-size: 12px;
             }
             .border-top { 
               border-top: 1px dashed #000;
-              margin-top: 2px;
-              padding-top: 2px;
+              margin-top: 1mm;
+              padding-top: 1mm;
             }
             .header {
               border-bottom: 1px dashed #000;
-              padding-bottom: 2px;
-              margin-bottom: 2px;
+              padding-bottom: 1mm;
+              margin-bottom: 1mm;
             }
             .total-row {
               font-weight: bold;
-              font-size: 15px;
+              font-size: 13px;
             }
             .botones-impresion {
               position: fixed;
               top: 10px;
               right: 10px;
               z-index: 1000;
+              background: #fff;
+              padding: 5px;
+              border-radius: 5px;
+              box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             }
             .botones-impresion button {
-              margin-left: 5px;
+              margin: 0 5px;
               padding: 5px 10px;
               background: #007bff;
               color: white;
@@ -1560,9 +1543,24 @@ function reimprimirFactura(ventaId) {
             .botones-impresion button:hover {
               background: #0056b3;
             }
+            .logo-container {
+              text-align: center;
+              margin-bottom: 2mm;
+            }
+            .logo-container img {
+              max-width: 100%;
+              max-height: 80px;
+            }
             @media print {
               .botones-impresion {
                 display: none;
+              }
+              @page {
+                margin: 0;
+                size: 57mm auto;
+              }
+              body {
+                width: 57mm;
               }
             }
           </style>
@@ -1572,63 +1570,7 @@ function reimprimirFactura(ventaId) {
             <button onclick="window.print()">Imprimir</button>
             <button onclick="window.close()">Cerrar</button>
           </div>
-
-          <div class="logo-container">
-            ${localStorage.getItem('logoNegocio') ? 
-              `<img src="${localStorage.getItem('logoNegocio')}" alt="Logo">` : 
-              ''}
-          </div>
-
-          <div class="header text-center">
-            <h2 style="margin: 0; font-size: 14px;">RESTAURANTE</h2>
-            ${tipoPedido ? `<div class="mb-1">${tipoPedido}</div>` : ''}
-            <div class="mb-1">${venta.fecha}</div>
-            ${!venta.mesa.startsWith('DOM-') && !venta.mesa.startsWith('REC-') ? 
-              `<div class="mb-1">Mesa: ${venta.mesa}</div>` : ''}
-          </div>
-          
-          ${infoAdicional}
-          
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 40%">Producto</th>
-                <th style="width: 15%">Cant</th>
-                <th style="width: 20%">Precio</th>
-                <th style="width: 25%">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${venta.items.map(item => `
-                <tr>
-                  <td>${item.nombre}</td>
-                  <td>${item.cantidad}</td>
-                  <td>${formatearNumero(item.precio)}</td>
-                  <td>${formatearNumero(item.precio * item.cantidad)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="border-top">
-            <div class="mb-1">Subtotal: $ ${formatearNumero(venta.subtotal)}</div>
-            <div class="mb-1">Propina (${venta.propina}%): $ ${formatearNumero(venta.propinaMonto)}</div>
-            <div class="mb-1">Descuento: $ ${formatearNumero(venta.descuento)}</div>
-            ${venta.valorDomicilio > 0 ? `<div class="mb-1">Domicilio: $ ${formatearNumero(venta.valorDomicilio)}</div>` : ''}
-            <div class="mb-1 total-row">Total: $ ${formatearNumero(venta.total)}</div>
-          </div>
-          
-          <div class="border-top">
-            <div class="mb-1">Pago: ${venta.metodoPago}</div>
-            ${venta.metodoPago === 'efectivo' ? `
-              <div class="mb-1">Recibido: $ ${formatearNumero(venta.montoRecibido)}</div>
-              <div class="mb-1">Cambio: $ ${formatearNumero(venta.cambio)}</div>
-            ` : ''}
-          </div>
-          
-          <div class="text-center mt-1">
-            <div class="border-top">Emil Jiménez - Desarrollador Web</div>
-          </div>
+          <div id="contenido"></div>
         </body>
       </html>
     `;
@@ -1918,37 +1860,41 @@ function imprimirBalanceDiario() {
                     <style>
                         body { 
                             font-family: monospace;
-                            font-size: 14px;
-                            width: 80mm;
+                            font-size: 12px;
+                            width: 57mm;
                             margin: 0;
-                            padding: 2mm;
+                            padding: 1mm;
                         }
                         .text-center { text-align: center; }
                         .text-right { text-align: right; }
-                        .mb-1 { margin-bottom: 1px; }
-                        .mt-1 { margin-top: 1px; }
+                        .mb-1 { margin-bottom: 0.5mm; }
+                        .mt-1 { margin-top: 0.5mm; }
                         .border-top { 
                             border-top: 1px dashed #000;
-                            margin-top: 2px;
-                            padding-top: 2px;
+                            margin-top: 1mm;
+                            padding-top: 1mm;
                         }
                         .header {
                             border-bottom: 1px dashed #000;
-                            padding-bottom: 2px;
-                            margin-bottom: 2px;
+                            padding-bottom: 1mm;
+                            margin-bottom: 1mm;
                         }
                         .total-row {
                             font-weight: bold;
-                            font-size: 15px;
+                            font-size: 13px;
                         }
                         .botones-impresion {
                             position: fixed;
                             top: 10px;
                             right: 10px;
                             z-index: 1000;
+                            background: #fff;
+                            padding: 5px;
+                            border-radius: 5px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                         }
                         .botones-impresion button {
-                            margin-left: 5px;
+                            margin: 0 5px;
                             padding: 5px 10px;
                             background: #007bff;
                             color: white;
@@ -1959,9 +1905,24 @@ function imprimirBalanceDiario() {
                         .botones-impresion button:hover {
                             background: #0056b3;
                         }
+                        .logo-container {
+                            text-align: center;
+                            margin-bottom: 2mm;
+                        }
+                        .logo-container img {
+                            max-width: 100%;
+                            max-height: 80px;
+                        }
                         @media print {
                             .botones-impresion {
                                 display: none;
+                            }
+                            @page {
+                                margin: 0;
+                                size: 57mm auto;
+                            }
+                            body {
+                                width: 57mm;
                             }
                         }
                     </style>
@@ -2401,5 +2362,124 @@ function guardarGasto() {
     
     mostrarGastos();
     alert('Gasto guardado exitosamente');
+}
+
+// Función para generar recibo preliminar
+function generarReciboPreliminar() {
+  if (!mesaSeleccionada || !mesasActivas.has(mesaSeleccionada)) {
+    alert('Por favor, seleccione una mesa con productos');
+    return;
+  }
+
+  const pedido = mesasActivas.get(mesaSeleccionada);
+  if (!pedido || !pedido.items || pedido.items.length === 0) {
+    alert('No hay productos para generar recibo');
+    return;
+  }
+
+  // Calcular totales
+  const subtotal = pedido.items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+  const propina = parseFloat(document.getElementById('propina').value) || 0;
+  const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+  const valorDomicilio = mesaSeleccionada.startsWith('DOM-') ? (parseFloat(document.getElementById('valorDomicilio').value) || 0) : 0;
+  const propinaMonto = Math.round((subtotal * propina) / 100);
+  const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
+
+  // Obtener la ventana de impresión
+  const ventanaPrevia = obtenerVentanaImpresion();
+  if (!ventanaPrevia) {
+    alert('No se pudo abrir la ventana de impresión. Por favor, verifique que los bloqueadores de ventanas emergentes estén desactivados.');
+    return;
+  }
+
+  // Determinar tipo de pedido e información adicional
+  let tipoPedido = '';
+  let infoAdicional = '';
+
+  if (mesaSeleccionada.startsWith('DOM-')) {
+    tipoPedido = 'Pedido a Domicilio';
+    if (pedido.cliente) {
+      infoAdicional = `
+        <div class="border-top">
+          <div class="mb-1">Cliente: ${pedido.cliente}</div>
+          <div class="mb-1">Dir: ${pedido.direccion || 'No especificada'}</div>
+          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
+        </div>
+      `;
+    }
+  } else if (mesaSeleccionada.startsWith('REC-')) {
+    tipoPedido = 'Pedido para Recoger';
+    if (pedido.cliente) {
+      infoAdicional = `
+        <div class="border-top">
+          <div class="mb-1">Cliente: ${pedido.cliente}</div>
+          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
+          <div class="mb-1">Hora: ${pedido.horaRecoger || 'No especificada'}</div>
+        </div>
+      `;
+    }
+  }
+
+  const contenidoRecibo = `
+    <div class="logo-container">
+      ${localStorage.getItem('logoNegocio') ? 
+        `<img src="${localStorage.getItem('logoNegocio')}" alt="Logo">` : 
+        ''}
+    </div>
+
+    <div class="header text-center">
+      <h2 style="margin: 0; font-size: 14px;">RESTAURANTE</h2>
+      <div class="mb-1">RECIBO PRELIMINAR</div>
+      ${tipoPedido ? `<div class="mb-1">${tipoPedido}</div>` : ''}
+      <div class="mb-1">${new Date().toLocaleString()}</div>
+      ${!mesaSeleccionada.startsWith('DOM-') && !mesaSeleccionada.startsWith('REC-') ? 
+        `<div class="mb-1">Mesa: ${mesaSeleccionada}</div>` : ''}
+    </div>
+    
+    ${infoAdicional}
+    
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 40%">Producto</th>
+          <th style="width: 15%">Cant</th>
+          <th style="width: 20%">Precio</th>
+          <th style="width: 25%">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pedido.items.map(item => `
+          <tr>
+            <td><strong>${item.nombre}</strong></td>
+            <td>${item.cantidad}</td>
+            <td class="text-right">${formatearNumero(item.precio)}</td>
+            <td class="text-right">${formatearNumero(item.precio * item.cantidad)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    
+    <div class="border-top">
+      <div class="mb-1">Subtotal: <span class="text-right">$ ${formatearNumero(subtotal)}</span></div>
+      <div class="mb-1">Propina (${propina}%): <span class="text-right">$ ${formatearNumero(propinaMonto)}</span></div>
+      <div class="mb-1">Descuento: <span class="text-right">$ ${formatearNumero(descuento)}</span></div>
+      ${valorDomicilio > 0 ? `<div class="mb-1">Domicilio: <span class="text-right">$ ${formatearNumero(valorDomicilio)}</span></div>` : ''}
+      <div class="mb-1 total-row"><strong>Total: $ ${formatearNumero(total)}</strong></div>
+    </div>
+    
+    <div class="text-center mt-1">
+      <div class="border-top">RECIBO PRELIMINAR - NO VÁLIDO COMO FACTURA</div>
+      <div class="border-top">Emil Jiménez - Desarrollador Web</div>
+    </div>
+  `;
+
+  // Esperar a que el documento esté listo
+  setTimeout(() => {
+    const contenidoDiv = ventanaPrevia.document.getElementById('contenido');
+    if (contenidoDiv) {
+      contenidoDiv.innerHTML = contenidoRecibo;
+      ventanaPrevia.focus();
+    }
+  }, 100);
 }
   

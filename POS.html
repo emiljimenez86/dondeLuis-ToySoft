@@ -139,6 +139,46 @@
       gap: 10px;
       justify-content: center;
     }
+
+    @media print {
+      .botones-impresion {
+        display: none;
+      }
+      @page {
+        margin: 0;
+        size: 57mm auto;
+      }
+      body {
+        width: 57mm;
+        padding: 1mm;
+        font-size: 12px;
+      }
+      table {
+        font-size: 12px;
+      }
+      th, td {
+        padding: 0.5mm;
+      }
+      .header h2 {
+        font-size: 13px !important;
+      }
+      .total-row {
+        font-size: 13px;
+      }
+      .border-top {
+        margin-top: 1mm;
+        padding-top: 1mm;
+      }
+      .mb-1 {
+        margin-bottom: 0.5mm;
+      }
+      .mt-1 {
+        margin-top: 0.5mm;
+      }
+      .logo-container img {
+        max-height: 80px;
+      }
+    }
   </style>
 </head>
 <body class="bg-dark text-white">
