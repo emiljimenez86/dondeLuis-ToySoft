@@ -575,25 +575,24 @@ function generarTicketCocina(pedido) {
         <table>
           <thead>
             <tr>
-              <th>Cant</th>
-              <th>Producto</th>
-              <th>Detalles</th>
+              <th style="width: 20%; font-size: 18px;">Cant</th>
+              <th style="font-size: 18px;">Producto</th>
             </tr>
           </thead>
           <tbody>
-  `;
-
-  pedido.items.forEach(item => {
-    ticket += `
-      <tr>
-        <td>${item.cantidad}</td>
-        <td>${item.nombre}</td>
-        <td>${item.detalles || '-'}</td>
-      </tr>
-    `;
-  });
-
-  ticket += `
+            ${productos.map(item => `
+              <tr>
+                <td style="font-size: 24px; font-weight: bold;">${item.cantidad}</td>
+                <td>
+                  <div class="producto" style="font-weight: bold; font-size: 24px;">${item.nombre}</div>
+                  ${item.detalles ? `
+                    <div class="detalles" style="font-size: 16px; margin-top: 4px;">
+                      <span class="detalle-label">Detalle:</span> ${item.detalles}
+                    </div>
+                  ` : ''}
+                </td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
       </div>
@@ -622,7 +621,7 @@ function obtenerVentanaImpresion() {
         <style>
           body { 
             font-family: monospace;
-            font-size: 12px;
+            font-size: 14px;
             width: 57mm;
             margin: 0;
             padding: 1mm;
@@ -635,12 +634,12 @@ function obtenerVentanaImpresion() {
             width: 100%;
             border-collapse: collapse;
             margin: 1mm 0;
-            font-size: 12px;
+            font-size: 14px;
           }
           th, td { 
             padding: 0.5mm;
             text-align: left;
-            font-size: 12px;
+            font-size: 14px;
           }
           .border-top { 
             border-top: 1px dashed #000;
@@ -654,7 +653,7 @@ function obtenerVentanaImpresion() {
           }
           .total-row {
             font-weight: bold;
-            font-size: 13px;
+            font-size: 16px;
           }
           .botones-impresion {
             position: fixed;
@@ -684,7 +683,7 @@ function obtenerVentanaImpresion() {
           }
           .logo-container img {
             max-width: 100%;
-            max-height: 80px;
+            max-height: 120px;
           }
           @media print {
             .botones-impresion {
@@ -743,9 +742,9 @@ function imprimirTicketCocina(mesa, productos) {
   
   const contenido = `
     <div class="header text-center">
-      <h2 style="margin: 0; font-size: 14px;">COCINA</h2>
-      <div class="mb-1">Mesa: ${mesa}</div>
-      <div class="mb-1">Ronda: ${pedidoCompleto && pedidoCompleto.ronda ? pedidoCompleto.ronda : 1}</div>
+      <h2 style="margin: 0; font-size: 24px; font-weight: bold;">COCINA</h2>
+      <div class="mb-1" style="font-size: 20px; font-weight: bold;">Mesa: ${mesa}</div>
+      <div class="mb-1" style="font-size: 18px; font-weight: bold;">Ronda: ${pedidoCompleto && pedidoCompleto.ronda ? pedidoCompleto.ronda : 1}</div>
       <div class="mb-1">${new Date().toLocaleString()}</div>
     </div>
     
@@ -1403,7 +1402,7 @@ function procesarPago() {
     
     <div class="text-center mt-1">
       <div class="border-top">¡Gracias por su compra!</div>
-      <div class="border-top">Emil Jiménez - Desarrollador Web</div>
+      <div class="border-top">ToySoft POS</div>
     </div>
   `;
 
@@ -1487,7 +1486,7 @@ function reimprimirFactura(ventaId) {
           <style>
             body { 
               font-family: monospace;
-              font-size: 12px;
+              font-size: 14px;
               width: 57mm;
               margin: 0;
               padding: 1mm;
@@ -1500,12 +1499,12 @@ function reimprimirFactura(ventaId) {
               width: 100%;
               border-collapse: collapse;
               margin: 1mm 0;
-              font-size: 12px;
+              font-size: 14px;
             }
             th, td { 
               padding: 0.5mm;
               text-align: left;
-              font-size: 12px;
+              font-size: 14px;
             }
             .border-top { 
               border-top: 1px dashed #000;
@@ -1519,7 +1518,7 @@ function reimprimirFactura(ventaId) {
             }
             .total-row {
               font-weight: bold;
-              font-size: 13px;
+              font-size: 16px;
             }
             .botones-impresion {
               position: fixed;
@@ -1549,7 +1548,7 @@ function reimprimirFactura(ventaId) {
             }
             .logo-container img {
               max-width: 100%;
-              max-height: 80px;
+              max-height: 120px;
             }
             @media print {
               .botones-impresion {
@@ -1860,7 +1859,7 @@ function imprimirBalanceDiario() {
                     <style>
                         body { 
                             font-family: monospace;
-                            font-size: 12px;
+                            font-size: 14px;
                             width: 57mm;
                             margin: 0;
                             padding: 1mm;
@@ -1881,7 +1880,7 @@ function imprimirBalanceDiario() {
                         }
                         .total-row {
                             font-weight: bold;
-                            font-size: 13px;
+                            font-size: 16px;
                         }
                         .botones-impresion {
                             position: fixed;
@@ -1911,7 +1910,7 @@ function imprimirBalanceDiario() {
                         }
                         .logo-container img {
                             max-width: 100%;
-                            max-height: 80px;
+                            max-height: 120px;
                         }
                         @media print {
                             .botones-impresion {
@@ -1970,6 +1969,7 @@ function imprimirBalanceDiario() {
                     
                     <div class="text-center mt-1">
                         <div class="border-top">¡Fin del Balance!</div>
+                        <div class="border-top">ToySoft POS</div>
                     </div>
                 </body>
             </html>
@@ -2469,7 +2469,7 @@ function generarReciboPreliminar() {
     
     <div class="text-center mt-1">
       <div class="border-top">RECIBO PRELIMINAR - NO VÁLIDO COMO FACTURA</div>
-      <div class="border-top">Emil Jiménez - Desarrollador Web</div>
+      <div class="border-top">ToySoft POS</div>
     </div>
   `;
 
