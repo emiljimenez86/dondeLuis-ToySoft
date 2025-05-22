@@ -58,6 +58,17 @@ self.addEventListener('fetch', event => {
             .then(response => {
                 // Cache hit - return response
                 if (response) {
+                    // Verificar si la respuesta está en caché y es una petición a nuestros archivos
+                    if (event.request.url.startsWith(self.location.origin)) {
+                        // Hacer una petición en segundo plano para actualizar el caché
+                        fetch(event.request).then(networkResponse => {
+                            if (networkResponse.status === 200) {
+                                caches.open(CACHE_NAME).then(cache => {
+                                    cache.put(event.request, networkResponse);
+                                });
+                            }
+                        });
+                    }
                     return response;
                 }
 
