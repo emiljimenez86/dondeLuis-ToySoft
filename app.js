@@ -38,11 +38,10 @@ function guardarHistorialVentas() {
       console.error('historialVentas no es un array:', historialVentas);
       historialVentas = [];
     }
-    
-    // Guardar en localStorage
+    // Guardar en ambas claves para sincronizar
     localStorage.setItem('historialVentas', JSON.stringify(historialVentas));
+    localStorage.setItem('ventas', JSON.stringify(historialVentas)); // Sincroniza aquí
     console.log('Historial de ventas guardado:', historialVentas);
-    
     // Verificar que se guardó correctamente
     const guardado = localStorage.getItem('historialVentas');
     console.log('Verificación de guardado:', guardado);
@@ -863,15 +862,28 @@ function mostrarModalPago() {
       <option value="tarjeta">Tarjeta</option>
       <option value="transferencia">Transferencia</option>
       <option value="credito">Crédito</option>
+      <option value="mixto">Efectivo y Transferencia</option>
     `;
     
     // Mostrar el modal después de imprimir el recibo preliminar
     const modal = new bootstrap.Modal(document.getElementById('modalPago'));
     modal.show();
 
-    // Agregar event listeners
-    document.getElementById('montoRecibido').addEventListener('input', calcularCambio);
-    document.getElementById('metodoPago').addEventListener('change', toggleMetodoPago);
+    // Asegurarse de que el event listener no se duplique en montoRecibido
+    const montoRecibidoInput = document.getElementById('montoRecibido');
+    montoRecibidoInput.removeEventListener('input', calcularCambio);
+    montoRecibidoInput.addEventListener('input', calcularCambio);
+
+    // Asegurarse de que el event listener no se duplique en metodoPago
+    metodoPagoSelect.removeEventListener('change', toggleMetodoPago);
+    metodoPagoSelect.addEventListener('change', () => {
+      toggleMetodoPago();
+      calcularCambio(); // Sincroniza los campos al cambiar método
+    });
+
+    // Llamar a toggleMetodoPago y calcularCambio para ajustar los inputs y valores según el método seleccionado actual
+    toggleMetodoPago();
+    calcularCambio();
   }, 500); // Dar tiempo para que el usuario vea el recibo preliminar
 }
 
@@ -979,6 +991,7 @@ function seleccionarClientePago(cliente) {
       <option value="tarjeta">Tarjeta</option>
       <option value="transferencia">Transferencia</option>
       <option value="credito">Crédito</option>
+      <option value="mixto">Efectivo y Transferencia</option>
     `;
     
     // Mostrar mensaje de confirmación
@@ -1016,6 +1029,13 @@ function calcularCambio() {
     cambioElement.style.fontWeight = 'bold';
     cambioElement.style.fontSize = '1.2em';
   }
+
+  // Si el método de pago es mixto, actualizar automáticamente el monto de transferencia
+  const metodoPago = document.getElementById('metodoPago').value;
+  if (metodoPago === 'mixto') {
+    const montoTransferencia = total - montoRecibido;
+    document.getElementById('montoTransferencia').value = montoTransferencia > 0 ? montoTransferencia : 0;
+  }
 }
 
 // Función para alternar entre métodos de pago
@@ -1023,13 +1043,21 @@ function toggleMetodoPago() {
   const metodo = document.getElementById('metodoPago').value;
   const efectivoSection = document.getElementById('efectivoSection');
   const transferenciaSection = document.getElementById('transferenciaSection');
-  
+  const montoTransferenciaInput = document.getElementById('montoTransferencia');
+  // Mostrar/ocultar secciones según el método
   if (metodo === 'efectivo') {
     efectivoSection.style.display = 'block';
     transferenciaSection.style.display = 'none';
   } else if (metodo === 'transferencia') {
     efectivoSection.style.display = 'none';
     transferenciaSection.style.display = 'block';
+    // Ocultar monto por transferencia, mostrar solo número
+    if (montoTransferenciaInput) montoTransferenciaInput.style.display = 'none';
+  } else if (metodo === 'mixto') {
+    efectivoSection.style.display = 'block';
+    transferenciaSection.style.display = 'block';
+    // Mostrar monto por transferencia
+    if (montoTransferenciaInput) montoTransferenciaInput.style.display = '';
   } else if (metodo === 'credito') {
     efectivoSection.style.display = 'none';
     transferenciaSection.style.display = 'none';
@@ -1139,16 +1167,13 @@ function crearPedidoRecogerConCliente(cliente) {
   contadorRecoger++;
   guardarContadores();
   
-  const horaRecoger = prompt('Ingrese la hora de recoger (ej: 14:30):');
-  if (!horaRecoger) return;
-
   const idPedido = `REC-${contadorRecoger}`;
   const pedido = {
     tipo: 'recoger',
     numero: contadorRecoger,
     cliente: cliente.nombre,
     telefono: cliente.telefono,
-    horaRecoger,
+    horaRecoger: '', // Dejar vacío o poner 'No especificada' si prefieres
     items: [],
     estado: 'pendiente',
     fecha: new Date().toLocaleString(),
@@ -1271,6 +1296,18 @@ function procesarPago() {
   const propinaMonto = Math.round((subtotal * propina) / 100);
   const total = Math.round(subtotal + propinaMonto - descuento + valorDomicilio);
 
+  // Validar montos para pago mixto
+  if (metodoPago === 'mixto') {
+    const montoEfectivo = parseFloat(document.getElementById('montoRecibido').value) || 0;
+    const montoTransferencia = parseFloat(document.getElementById('montoTransferencia').value) || 0;
+    const totalMixto = montoEfectivo + montoTransferencia;
+
+    if (totalMixto !== total) {
+      alert('La suma de los montos en efectivo y transferencia debe ser igual al total');
+      return;
+    }
+  }
+
   // Crear objeto de factura
   const factura = {
     id: Date.now(),
@@ -1284,8 +1321,10 @@ function procesarPago() {
     valorDomicilio: valorDomicilio,
     total: total,
     metodoPago: metodoPago,
-    montoRecibido: metodoPago === 'efectivo' ? parseFloat(document.getElementById('montoRecibido').value) : 0,
-    cambio: metodoPago === 'efectivo' ? Math.round(parseFloat(document.getElementById('montoRecibido').value) - total) : 0,
+    montoRecibido: metodoPago === 'efectivo' || metodoPago === 'mixto' ? parseFloat(document.getElementById('montoRecibido').value) : 0,
+    montoTransferencia: metodoPago === 'transferencia' || metodoPago === 'mixto' ? parseFloat(document.getElementById('montoTransferencia').value) : 0,
+    cambio: metodoPago === 'efectivo' || metodoPago === 'mixto' ? Math.round(parseFloat(document.getElementById('montoRecibido').value) - (metodoPago === 'mixto' ? parseFloat(document.getElementById('montoRecibido').value) : total)) : 0,
+    numeroTransferencia: metodoPago === 'transferencia' || metodoPago === 'mixto' ? document.getElementById('numeroTransferencia').value : null,
     cliente: pedido.cliente || null,
     telefono: pedido.telefono || null,
     direccion: pedido.direccion || null,
@@ -1337,7 +1376,7 @@ function procesarPago() {
         <div class="border-top">
           <div class="mb-1">Cliente: ${pedido.cliente}</div>
           <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
-          <div class="mb-1">Hora: ${pedido.horaRecoger || 'No especificada'}</div>
+          ${pedido.horaRecoger ? `<div class="mb-1">Hora: ${pedido.horaRecoger}</div>` : ''}
         </div>
       `;
     }
@@ -1392,11 +1431,18 @@ function procesarPago() {
     <div class="border-top">
       <div class="mb-1">Método de Pago: ${metodoPago}</div>
       ${metodoPago === 'efectivo' ? `
-        <div class="mb-1">Recibido: $ ${formatearNumero(factura.montoRecibido)}</div>
+        <div class="mb-1">Recibido en Efectivo: $ ${formatearNumero(factura.montoRecibido)}</div>
         <div class="mb-1">Cambio: $ ${formatearNumero(factura.cambio)}</div>
       ` : ''}
       ${metodoPago === 'transferencia' ? `
-        <div class="mb-1">N° Transferencia: ${document.getElementById('numeroTransferencia').value}</div>
+        <div class="mb-1">N° Transferencia: ${factura.numeroTransferencia}</div>
+        <div class="mb-1">Transferencia: $ ${formatearNumero(factura.montoTransferencia)}</div>
+      ` : ''}
+      ${metodoPago === 'mixto' ? `
+        <div class="mb-1">Monto en Efectivo: $ ${formatearNumero(factura.montoRecibido)}</div>
+        <div class="mb-1">Cambio: $ ${formatearNumero(factura.cambio)}</div>
+        <div class="mb-1">N° Transferencia: ${factura.numeroTransferencia}</div>
+        <div class="mb-1">Transferencia: $ ${formatearNumero(factura.montoTransferencia)}</div>
       ` : ''}
     </div>
     
@@ -1583,77 +1629,65 @@ function reimprimirFactura(ventaId) {
 function mostrarModalCierreDiario() {
     try {
         console.log('Iniciando mostrarModalCierreDiario...');
-        
-        // Asegurarse de que historialVentas esté cargado
-        if (!historialVentas) {
-            const historialGuardado = localStorage.getItem('historialVentas');
-            if (historialGuardado) {
-                try {
-                    historialVentas = JSON.parse(historialGuardado);
-                    if (!Array.isArray(historialVentas)) {
-                        console.error('historialVentas no es un array:', historialVentas);
-                        historialVentas = [];
-                    }
-                } catch (error) {
-                    console.error('Error al parsear historialVentas:', error);
-                    historialVentas = [];
-                }
-            } else {
-                historialVentas = [];
-            }
-        }
-        
-        // Obtener ventas del día
+        // Obtener ventas del día desde la clave 'ventas'
+        const ventas = JSON.parse(localStorage.getItem('ventas')) || [];
         const hoy = new Date();
-        const hoyStr = hoy.toLocaleDateString();
-        
-        const ventasHoy = historialVentas.filter(v => {
-            try {
-                const fechaVenta = new Date(v.fecha);
-                return fechaVenta.toLocaleDateString() === hoyStr;
-            } catch (error) {
-                console.error('Error al procesar fecha de venta:', error);
-                return false;
-            }
+        const hoyStr = hoy.toISOString().slice(0, 10); // YYYY-MM-DD
+        const ventasHoy = ventas.filter(v => {
+            const fechaVenta = new Date(v.fecha);
+            const fechaVentaStr = fechaVenta.toISOString().slice(0, 10);
+            return fechaVentaStr === hoyStr;
         });
-        
-        // Calcular totales
-        const totalVentas = ventasHoy.reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalEfectivo = ventasHoy.filter(v => v.metodoPago === 'efectivo')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalTransferencia = ventasHoy.filter(v => v.metodoPago === 'transferencia')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalTarjeta = ventasHoy.filter(v => v.metodoPago === 'tarjeta')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalCredito = ventasHoy.filter(v => v.metodoPago === 'credito')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        
+        // Calcular totales por método de pago
+        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
+        ventasHoy.forEach(v => {
+            const total = parseFloat(v.total) || 0;
+            const metodo = (v.metodoPago || '').toLowerCase();
+            if (metodo === 'mixto') {
+                const efectivoMixto = parseFloat(v.montoRecibido) || 0;
+                const transferenciaMixto = parseFloat(v.montoTransferencia) || 0;
+                totalMixto += total;
+                totalEfectivo += efectivoMixto;
+                totalTransferencia += transferenciaMixto;
+            } else {
+                switch (metodo) {
+                    case 'efectivo':
+                        totalEfectivo += total;
+                        break;
+                    case 'transferencia':
+                        totalTransferencia += total;
+                        break;
+                    case 'tarjeta':
+                        totalTarjeta += total;
+                        break;
+                    case 'crédito':
+                        totalCredito += total;
+                        break;
+                }
+            }
+            totalVentas += total;
+        });
         // Obtener gastos del día
         const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
         const gastosHoy = gastos.filter(g => {
-            try {
-                return new Date(g.fecha).toLocaleDateString() === hoyStr;
-            } catch (error) {
-                console.error('Error al procesar fecha de gasto:', error);
-                return false;
-            }
+            const fechaGasto = new Date(g.fecha);
+            const fechaGastoStr = fechaGasto.toISOString().slice(0, 10);
+            return fechaGastoStr === hoyStr;
         });
-        const totalGastos = gastosHoy.reduce((sum, g) => sum + (g.monto || 0), 0);
-        
-        // Calcular balance final (solo ventas pagadas)
-        const balanceFinal = totalVentas - totalCredito - totalGastos;
-        
+        const totalGastos = gastosHoy.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
+        // Calcular balance final
+        const balanceFinal = totalVentas - totalGastos;
         // Actualizar valores en el modal
         document.getElementById('totalVentasHoy').textContent = `$ ${totalVentas.toLocaleString()}`;
         document.getElementById('totalEfectivoHoy').textContent = `$ ${totalEfectivo.toLocaleString()}`;
         document.getElementById('totalTransferenciaHoy').textContent = `$ ${totalTransferencia.toLocaleString()}`;
-        document.getElementById('totalTarjetaHoy').textContent = `$ ${totalTarjeta.toLocaleString()}`;
-        document.getElementById('totalCreditoHoy').textContent = `$ ${totalCredito.toLocaleString()}`;
+        if(document.getElementById('totalTarjetaHoy')) document.getElementById('totalTarjetaHoy').textContent = `$ ${totalTarjeta.toLocaleString()}`;
+        if(document.getElementById('totalCreditoHoy')) document.getElementById('totalCreditoHoy').textContent = `$ ${totalCredito.toLocaleString()}`;
+        if(document.getElementById('totalMixtoHoy')) document.getElementById('totalMixtoHoy').textContent = `$ ${totalMixto.toLocaleString()}`;
         document.getElementById('totalGastosHoy').textContent = `$ ${totalGastos.toLocaleString()}`;
         document.getElementById('balanceFinal').textContent = `$ ${balanceFinal.toLocaleString()}`;
-        
         // Actualizar detalles de créditos pendientes
-        const creditosPendientes = ventasHoy.filter(v => v.metodoPago === 'credito');
+        const creditosPendientes = ventasHoy.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito');
         const detallesCreditos = document.getElementById('detallesCreditos');
         if (detallesCreditos) {
             detallesCreditos.innerHTML = creditosPendientes.map(credito => `
@@ -1664,14 +1698,11 @@ function mostrarModalCierreDiario() {
                 </div>
             `).join('') || '<div>No hay créditos pendientes</div>';
         }
-        
         // Limpiar el campo de detalles
         document.getElementById('detallesCierre').value = '';
-        
         // Mostrar el modal
         const modal = new bootstrap.Modal(document.getElementById('modalCierreDiario'));
         modal.show();
-        
         console.log('Modal de cierre diario mostrado correctamente');
     } catch (error) {
         console.error('Error en mostrarModalCierreDiario:', error);
@@ -1826,32 +1857,56 @@ function exportarCierresDiariosExcel() {
 
 function imprimirBalanceDiario() {
     try {
-        // Obtener ventas del día
-        const hoy = new Date().toLocaleDateString();
-        const ventasHoy = historialVentas.filter(v => new Date(v.fecha).toLocaleDateString() === hoy);
-        
-        // Calcular totales
-        const totalVentas = ventasHoy.reduce((sum, v) => sum + v.total, 0);
-        const totalEfectivo = ventasHoy.filter(v => v.metodoPago === 'efectivo')
-            .reduce((sum, v) => sum + v.total, 0);
-        const totalTransferencia = ventasHoy.filter(v => v.metodoPago === 'transferencia')
-            .reduce((sum, v) => sum + v.total, 0);
-        const totalTarjeta = ventasHoy.filter(v => v.metodoPago === 'tarjeta')
-            .reduce((sum, v) => sum + v.total, 0);
-        const totalCredito = ventasHoy.filter(v => v.metodoPago === 'credito')
-            .reduce((sum, v) => sum + v.total, 0);
-        
+        // Obtener ventas del día desde la clave 'ventas'
+        const ventas = JSON.parse(localStorage.getItem('ventas')) || [];
+        const hoy = new Date();
+        const hoyStr = hoy.toISOString().slice(0, 10); // YYYY-MM-DD
+        const ventasHoy = ventas.filter(v => {
+            const fechaVenta = new Date(v.fecha);
+            const fechaVentaStr = fechaVenta.toISOString().slice(0, 10);
+            return fechaVentaStr === hoyStr;
+        });
+        // Calcular totales por método de pago (igual que en el modal)
+        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
+        ventasHoy.forEach(v => {
+            const total = parseFloat(v.total) || 0;
+            const metodo = (v.metodoPago || '').toLowerCase();
+            if (metodo === 'mixto') {
+                const efectivoMixto = parseFloat(v.montoRecibido) || 0;
+                const transferenciaMixto = parseFloat(v.montoTransferencia) || 0;
+                totalMixto += total;
+                totalEfectivo += efectivoMixto;
+                totalTransferencia += transferenciaMixto;
+            } else {
+                switch (metodo) {
+                    case 'efectivo':
+                        totalEfectivo += total;
+                        break;
+                    case 'transferencia':
+                        totalTransferencia += total;
+                        break;
+                    case 'tarjeta':
+                        totalTarjeta += total;
+                        break;
+                    case 'crédito':
+                        totalCredito += total;
+                        break;
+                }
+            }
+            totalVentas += total;
+        });
         // Obtener gastos del día
         const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
-        const gastosHoy = gastos.filter(g => new Date(g.fecha).toLocaleDateString() === hoy);
-        const totalGastos = gastosHoy.reduce((sum, g) => sum + g.monto, 0);
-        
+        const gastosHoy = gastos.filter(g => {
+            const fechaGasto = new Date(g.fecha);
+            const fechaGastoStr = fechaGasto.toISOString().slice(0, 10);
+            return fechaGastoStr === hoyStr;
+        });
+        const totalGastos = gastosHoy.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
         // Calcular balance final
-        const balanceFinal = totalVentas - totalCredito - totalGastos;
-
+        const balanceFinal = totalVentas - totalGastos;
         // Crear ventana de impresión
         const ventana = obtenerVentanaImpresion();
-        
         const contenido = `
             <html>
                 <head>
@@ -1934,7 +1989,7 @@ function imprimirBalanceDiario() {
 
                     <div class="header text-center">
                         <h2 style="margin: 0; font-size: 14px;">BALANCE DIARIO</h2>
-                        <div class="mb-1">${hoy}</div>
+                        <div class="mb-1">${hoyStr}</div>
                     </div>
                     
                     <div class="border-top">
@@ -1962,7 +2017,7 @@ function imprimirBalanceDiario() {
 
                     <div class="border-top mt-1">
                         <div class="mb-1">Créditos Pendientes:</div>
-                        ${ventasHoy.filter(v => v.metodoPago === 'credito').map(credito => `
+                        ${ventasHoy.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito').map(credito => `
                             <div class="mb-1">- ${credito.cliente || 'No especificado'}: $ ${credito.total.toLocaleString()}</div>
                         `).join('') || '<div class="mb-1">No hay créditos pendientes</div>'}
                     </div>
@@ -1974,7 +2029,6 @@ function imprimirBalanceDiario() {
                 </body>
             </html>
         `;
-        
         ventana.document.write(contenido);
         ventana.document.close();
     } catch (error) {
@@ -2414,7 +2468,7 @@ function generarReciboPreliminar() {
         <div class="border-top">
           <div class="mb-1">Cliente: ${pedido.cliente}</div>
           <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
-          <div class="mb-1">Hora: ${pedido.horaRecoger || 'No especificada'}</div>
+          ${pedido.horaRecoger ? `<div class="mb-1">Hora: ${pedido.horaRecoger}</div>` : ''}
         </div>
       `;
     }
@@ -2481,5 +2535,212 @@ function generarReciboPreliminar() {
       ventanaPrevia.focus();
     }
   }, 100);
+}
+
+function imprimirBalancePorPeriodo(tipoPeriodo) {
+    try {
+        // Obtener ventas desde la clave 'ventas'
+        const ventas = JSON.parse(localStorage.getItem('ventas')) || [];
+        const hoy = new Date();
+        let fechaInicio, fechaFin;
+        // Determinar el rango de fechas según el tipo de período
+        switch(tipoPeriodo) {
+            case 'semanal':
+                fechaInicio = new Date(hoy);
+                fechaInicio.setDate(hoy.getDate() - hoy.getDay() + 1);
+                fechaInicio.setHours(0, 0, 0, 0);
+                fechaFin = new Date(fechaInicio);
+                fechaFin.setDate(fechaInicio.getDate() + 6);
+                fechaFin.setHours(23, 59, 59, 999);
+                break;
+            case 'mensual':
+                fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+                fechaInicio.setHours(0, 0, 0, 0);
+                fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                break;
+            case 'anual':
+                fechaInicio = new Date(hoy.getFullYear(), 0, 1);
+                fechaInicio.setHours(0, 0, 0, 0);
+                fechaFin = new Date(hoy.getFullYear(), 11, 31);
+                fechaFin.setHours(23, 59, 59, 999);
+                break;
+            default:
+                throw new Error('Tipo de período no válido');
+        }
+        // Filtrar ventas por rango de fechas
+        const ventasFiltradas = ventas.filter(v => {
+            const fechaVenta = new Date(v.fecha);
+            return fechaVenta >= fechaInicio && fechaVenta <= fechaFin;
+        });
+        // Calcular totales por método de pago (igual que en el balance diario)
+        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
+        ventasFiltradas.forEach(v => {
+            const total = parseFloat(v.total) || 0;
+            const metodo = (v.metodoPago || '').toLowerCase();
+            if (metodo === 'mixto') {
+                const efectivoMixto = parseFloat(v.montoRecibido) || 0;
+                const transferenciaMixto = parseFloat(v.montoTransferencia) || 0;
+                totalMixto += total;
+                totalEfectivo += efectivoMixto;
+                totalTransferencia += transferenciaMixto;
+            } else {
+                switch (metodo) {
+                    case 'efectivo':
+                        totalEfectivo += total;
+                        break;
+                    case 'transferencia':
+                        totalTransferencia += total;
+                        break;
+                    case 'tarjeta':
+                        totalTarjeta += total;
+                        break;
+                    case 'crédito':
+                        totalCredito += total;
+                        break;
+                }
+            }
+            totalVentas += total;
+        });
+        // Obtener gastos del período
+        const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
+        const gastosFiltrados = gastos.filter(gasto => {
+            const fechaGasto = new Date(gasto.fecha);
+            return fechaGasto >= fechaInicio && fechaGasto <= fechaFin;
+        });
+        const totalGastos = gastosFiltrados.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
+        // Calcular balance final
+        const balanceFinal = totalVentas - totalGastos;
+        // Formatear fechas para mostrar
+        const formatoFecha = (fecha) => {
+            return fecha.toLocaleDateString('es-ES', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        };
+        const ventana = obtenerVentanaImpresion();
+        const contenido = `
+            <html>
+                <head>
+                    <title>Balance ${tipoPeriodo.charAt(0).toUpperCase() + tipoPeriodo.slice(1)}</title>
+                    <style>
+                        body { 
+                            font-family: monospace;
+                            font-size: 14px;
+                            width: 57mm;
+                            margin: 0;
+                            padding: 1mm;
+                        }
+                        .text-center { text-align: center; }
+                        .text-right { text-align: right; }
+                        .mb-1 { margin-bottom: 0.5mm; }
+                        .mt-1 { margin-top: 0.5mm; }
+                        .border-top { 
+                            border-top: 1px dashed #000;
+                            margin-top: 1mm;
+                            padding-top: 1mm;
+                        }
+                        .header {
+                            border-bottom: 1px dashed #000;
+                            padding-bottom: 1mm;
+                            margin-bottom: 1mm;
+                        }
+                        .total-row {
+                            font-weight: bold;
+                            font-size: 16px;
+                        }
+                        .botones-impresion {
+                            position: fixed;
+                            top: 10px;
+                            right: 10px;
+                            z-index: 1000;
+                            background: #fff;
+                            padding: 5px;
+                            border-radius: 5px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        }
+                        .botones-impresion button {
+                            margin: 0 5px;
+                            padding: 5px 10px;
+                            background: #007bff;
+                            color: white;
+                            border: none;
+                            border-radius: 3px;
+                            cursor: pointer;
+                        }
+                        .botones-impresion button:hover {
+                            background: #0056b3;
+                        }
+                        .logo-container {
+                            text-align: center;
+                            margin-bottom: 2mm;
+                        }
+                        .logo-container img {
+                            max-width: 100%;
+                            max-height: 120px;
+                        }
+                        @media print {
+                            .botones-impresion {
+                                display: none;
+                            }
+                            @page {
+                                margin: 0;
+                                size: 57mm auto;
+                            }
+                            body {
+                                width: 57mm;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="botones-impresion">
+                        <button onclick="window.print()">Imprimir</button>
+                        <button onclick="window.close()">Cerrar</button>
+                    </div>
+                    <div class="header text-center">
+                        <h2 style="margin: 0; font-size: 14px;">BALANCE ${tipoPeriodo.toUpperCase()}</h2>
+                        <div class="mb-1">Del ${formatoFecha(fechaInicio)}</div>
+                        <div class="mb-1">Al ${formatoFecha(fechaFin)}</div>
+                    </div>
+                    <div class="border-top">
+                        <div class="mb-1">Total Ventas: $ ${totalVentas.toLocaleString()}</div>
+                        <div class="mb-1">- Efectivo: $ ${totalEfectivo.toLocaleString()}</div>
+                        <div class="mb-1">- Transferencia: $ ${totalTransferencia.toLocaleString()}</div>
+                        <div class="mb-1">- Tarjeta: $ ${totalTarjeta.toLocaleString()}</div>
+                        <div class="mb-1">- Crédito: $ ${totalCredito.toLocaleString()}</div>
+                    </div>
+                    <div class="border-top">
+                        <div class="mb-1">Total Gastos: $ ${totalGastos.toLocaleString()}</div>
+                    </div>
+                    <div class="border-top">
+                        <div class="mb-1 total-row">Balance Final: $ ${balanceFinal.toLocaleString()}</div>
+                    </div>
+                    <div class="border-top mt-1">
+                        <div class="mb-1">Detalle de Gastos:</div>
+                        ${gastosFiltrados.map(gasto => `
+                            <div class="mb-1">- ${gasto.descripcion}: $ ${gasto.monto.toLocaleString()}</div>
+                        `).join('')}
+                    </div>
+                    <div class="border-top mt-1">
+                        <div class="mb-1">Créditos Pendientes:</div>
+                        ${ventasFiltradas.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito').map(credito => `
+                            <div class="mb-1">- ${credito.cliente || 'No especificado'}: $ ${credito.total.toLocaleString()}</div>
+                        `).join('') || '<div class="mb-1">No hay créditos pendientes</div>'}
+                    </div>
+                    <div class="text-center mt-1">
+                        <div class="border-top">¡Fin del Balance!</div>
+                        <div class="border-top">ToySoft POS</div>
+                    </div>
+                </body>
+            </html>
+        `;
+        ventana.document.write(contenido);
+        ventana.document.close();
+    } catch (error) {
+        console.error('Error al imprimir balance:', error);
+        alert('Error al generar el balance: ' + error.message);
+    }
 }
   

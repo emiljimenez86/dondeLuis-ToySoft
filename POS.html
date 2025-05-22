@@ -179,21 +179,57 @@
         max-height: 80px;
       }
     }
+
+    #propina, #descuento {
+      margin-bottom: 4px !important;
+      margin-top: 0 !important;
+    }
+    .orden-panel .row.g-3.mt-3 {
+      margin-top: 8px !important;
+    }
+    .d-flex.flex-column.flex-md-row.justify-content-between.align-items-center.mt-4 {
+      margin-top: 8px !important;
+    }
+    /* Compactar tabla de orden */
+    .orden-panel table th, .orden-panel table td {
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+      padding-left: 6px !important;
+      padding-right: 6px !important;
+      font-size: 0.98em;
+    }
+    .orden-panel .table-secondary {
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+      font-size: 0.95em;
+      margin-bottom: 0 !important;
+    }
+    .orden-panel .table-responsive {
+      margin-bottom: 6px !important;
+    }
+    .orden-panel .row.g-3.mt-3 {
+      margin-top: 4px !important;
+      margin-bottom: 4px !important;
+    }
+    .orden-panel input.form-control {
+      margin-bottom: 2px !important;
+      margin-top: 0 !important;
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+      font-size: 0.98em;
+    }
   </style>
 </head>
-<body class="bg-dark text-white">
-  <script src="seguridad.js"></script>
-  <script src="app.js"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      verificarAcceso();
-    });
-  </script>
+<body class="d-flex flex-column min-vh-100">
   <div class="container-fluid py-3">
     <div class="row mb-4">
       <div class="col-12">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
-          <h1 class="nombreRestaurante mb-3 mb-md-0">POS Donde Luis Restaurante</h1>
+          <!-- Header con logo y título -->
+          <div class="d-flex align-items-center mb-4" style="gap: 20px;">
+            <img src="image/logo-ToySoft.png" alt="Logo" style="height: 80px; width: 80px; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.12); object-fit: cover;">
+            <h1 class="nombreRestaurante mb-0">POS Donde Luis Restaurante</h1>
+          </div>
           <div class="d-flex gap-2">
             <a href="historial.html" class="btn btn-info">
               <i class="fas fa-history"></i> Historial
@@ -424,13 +460,14 @@
               <option value="efectivo">Efectivo</option>
               <option value="tarjeta">Tarjeta</option>
               <option value="transferencia">Transferencia</option>
+              <option value="mixto">Mixto (Efectivo + Transferencia)</option>
             </select>
           </div>
 
           <!-- Sección de Efectivo -->
           <div id="efectivoSection" class="mb-3">
             <div class="mb-3">
-              <label class="form-label">Monto Recibido</label>
+              <label class="form-label">Monto en Efectivo</label>
               <input type="number" id="montoRecibido" class="form-control bg-dark text-white border-light">
             </div>
             <div class="mb-3">
@@ -444,6 +481,10 @@
             <div class="mb-3">
               <label class="form-label">Número de Transferencia</label>
               <input type="text" id="numeroTransferencia" class="form-control bg-dark text-white border-light">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Monto por Transferencia</label>
+              <input type="number" id="montoTransferencia" class="form-control bg-dark text-white border-light">
             </div>
           </div>
         </div>
@@ -575,5 +616,12 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="seguridad.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      verificarAcceso();
+    });
+  </script>
 </body>
 </html> 

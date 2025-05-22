@@ -245,6 +245,36 @@
                 </div>
             </div>
         </div>
+
+        <!-- Sección de Balances por Período -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card bg-dark text-white">
+                    <div class="card-header">
+                        <h5 class="mb-0">Balances por Período</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100 mb-2" onclick="imprimirBalancePorPeriodo('semanal')">
+                                    <i class="fas fa-calendar-week"></i> Balance Semanal
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100 mb-2" onclick="imprimirBalancePorPeriodo('mensual')">
+                                    <i class="fas fa-calendar-alt"></i> Balance Mensual
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100 mb-2" onclick="imprimirBalancePorPeriodo('anual')">
+                                    <i class="fas fa-calendar"></i> Balance Anual
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Cierre Diario -->
