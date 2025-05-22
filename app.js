@@ -2573,7 +2573,7 @@ function imprimirBalancePorPeriodo(tipoPeriodo) {
             const fechaVenta = new Date(v.fecha);
             return fechaVenta >= fechaInicio && fechaVenta <= fechaFin;
         });
-        // Calcular totales por método de pago (igual que en el balance diario)
+        // Calcular totales por método de pago
         let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
         ventasFiltradas.forEach(v => {
             const total = parseFloat(v.total) || 0;
@@ -2619,128 +2619,124 @@ function imprimirBalancePorPeriodo(tipoPeriodo) {
                 day: 'numeric'
             });
         };
-        const ventana = obtenerVentanaImpresion();
-        const contenido = `
-            <html>
-                <head>
-                    <title>Balance ${tipoPeriodo.charAt(0).toUpperCase() + tipoPeriodo.slice(1)}</title>
-                    <style>
-                        body { 
-                            font-family: monospace;
-                            font-size: 14px;
-                            width: 57mm;
-                            margin: 0;
-                            padding: 1mm;
-                        }
-                        .text-center { text-align: center; }
-                        .text-right { text-align: right; }
-                        .mb-1 { margin-bottom: 0.5mm; }
-                        .mt-1 { margin-top: 0.5mm; }
-                        .border-top { 
-                            border-top: 1px dashed #000;
-                            margin-top: 1mm;
-                            padding-top: 1mm;
-                        }
-                        .header {
-                            border-bottom: 1px dashed #000;
-                            padding-bottom: 1mm;
-                            margin-bottom: 1mm;
-                        }
-                        .total-row {
-                            font-weight: bold;
-                            font-size: 16px;
-                        }
-                        .botones-impresion {
-                            position: fixed;
-                            top: 10px;
-                            right: 10px;
-                            z-index: 1000;
-                            background: #fff;
-                            padding: 5px;
-                            border-radius: 5px;
-                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                        }
-                        .botones-impresion button {
-                            margin: 0 5px;
-                            padding: 5px 10px;
-                            background: #007bff;
-                            color: white;
-                            border: none;
-                            border-radius: 3px;
-                            cursor: pointer;
-                        }
-                        .botones-impresion button:hover {
-                            background: #0056b3;
-                        }
-                        .logo-container {
-                            text-align: center;
-                            margin-bottom: 2mm;
-                        }
-                        .logo-container img {
-                            max-width: 100%;
-                            max-height: 120px;
-                        }
-                        @media print {
-                            .botones-impresion {
-                                display: none;
-                            }
-                            @page {
-                                margin: 0;
-                                size: 57mm auto;
-                            }
-                            body {
-                                width: 57mm;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="botones-impresion">
-                        <button onclick="window.print()">Imprimir</button>
-                        <button onclick="window.close()">Cerrar</button>
+
+        // Crear una ventana modal en lugar de una nueva ventana
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'modalBalance';
+        modal.setAttribute('tabindex', '-1');
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-labelledby', 'modalBalanceLabel');
+        modal.setAttribute('aria-hidden', 'true');
+        
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content bg-dark text-white">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalBalanceLabel">Balance ${tipoPeriodo.charAt(0).toUpperCase() + tipoPeriodo.slice(1)}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="header text-center">
-                        <h2 style="margin: 0; font-size: 14px;">BALANCE ${tipoPeriodo.toUpperCase()}</h2>
-                        <div class="mb-1">Del ${formatoFecha(fechaInicio)}</div>
-                        <div class="mb-1">Al ${formatoFecha(fechaFin)}</div>
+                    <div class="modal-body">
+                        <div class="text-center mb-3">
+                            <h4>Del ${formatoFecha(fechaInicio)}</h4>
+                            <h4>Al ${formatoFecha(fechaFin)}</h4>
+                        </div>
+                        <div class="border-top border-light pt-3 mb-3">
+                            <h5>Total Ventas: $ ${totalVentas.toLocaleString()}</h5>
+                            <div>- Efectivo: $ ${totalEfectivo.toLocaleString()}</div>
+                            <div>- Transferencia: $ ${totalTransferencia.toLocaleString()}</div>
+                            <div>- Tarjeta: $ ${totalTarjeta.toLocaleString()}</div>
+                            <div>- Crédito: $ ${totalCredito.toLocaleString()}</div>
+                        </div>
+                        <div class="border-top border-light pt-3 mb-3">
+                            <h5>Total Gastos: $ ${totalGastos.toLocaleString()}</h5>
+                        </div>
+                        <div class="border-top border-light pt-3 mb-3">
+                            <h5>Balance Final: $ ${balanceFinal.toLocaleString()}</h5>
+                        </div>
+                        <div class="border-top border-light pt-3 mb-3">
+                            <h5>Detalle de Gastos:</h5>
+                            ${gastosFiltrados.map(gasto => `
+                                <div>- ${gasto.descripcion}: $ ${gasto.monto.toLocaleString()}</div>
+                            `).join('')}
+                        </div>
+                        <div class="border-top border-light pt-3">
+                            <h5>Créditos Pendientes:</h5>
+                            ${ventasFiltradas.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito').map(credito => `
+                                <div>- ${credito.cliente || 'No especificado'}: $ ${credito.total.toLocaleString()}</div>
+                            `).join('') || '<div>No hay créditos pendientes</div>'}
+                        </div>
                     </div>
-                    <div class="border-top">
-                        <div class="mb-1">Total Ventas: $ ${totalVentas.toLocaleString()}</div>
-                        <div class="mb-1">- Efectivo: $ ${totalEfectivo.toLocaleString()}</div>
-                        <div class="mb-1">- Transferencia: $ ${totalTransferencia.toLocaleString()}</div>
-                        <div class="mb-1">- Tarjeta: $ ${totalTarjeta.toLocaleString()}</div>
-                        <div class="mb-1">- Crédito: $ ${totalCredito.toLocaleString()}</div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="button" class="btn btn-primary" onclick="imprimirBalanceModal()">Imprimir</button>
                     </div>
-                    <div class="border-top">
-                        <div class="mb-1">Total Gastos: $ ${totalGastos.toLocaleString()}</div>
-                    </div>
-                    <div class="border-top">
-                        <div class="mb-1 total-row">Balance Final: $ ${balanceFinal.toLocaleString()}</div>
-                    </div>
-                    <div class="border-top mt-1">
-                        <div class="mb-1">Detalle de Gastos:</div>
-                        ${gastosFiltrados.map(gasto => `
-                            <div class="mb-1">- ${gasto.descripcion}: $ ${gasto.monto.toLocaleString()}</div>
-                        `).join('')}
-                    </div>
-                    <div class="border-top mt-1">
-                        <div class="mb-1">Créditos Pendientes:</div>
-                        ${ventasFiltradas.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito').map(credito => `
-                            <div class="mb-1">- ${credito.cliente || 'No especificado'}: $ ${credito.total.toLocaleString()}</div>
-                        `).join('') || '<div class="mb-1">No hay créditos pendientes</div>'}
-                    </div>
-                    <div class="text-center mt-1">
-                        <div class="border-top">¡Fin del Balance!</div>
-                        <div class="border-top">ToySoft POS</div>
-                    </div>
-                </body>
-            </html>
+                </div>
+            </div>
         `;
-        ventana.document.write(contenido);
-        ventana.document.close();
+
+        // Agregar el modal al body
+        document.body.appendChild(modal);
+
+        // Inicializar el modal de Bootstrap
+        const modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
+
+        // Limpiar el modal cuando se cierre
+        modal.addEventListener('hidden.bs.modal', function () {
+            document.body.removeChild(modal);
+        });
+
     } catch (error) {
-        console.error('Error al imprimir balance:', error);
+        console.error('Error al generar balance:', error);
         alert('Error al generar el balance: ' + error.message);
     }
+}
+
+// Función para imprimir el balance desde el modal
+function imprimirBalanceModal() {
+    const modalContent = document.querySelector('#modalBalance .modal-content');
+    const ventana = window.open('', '_blank');
+    
+    ventana.document.write(`
+        <html>
+            <head>
+                <title>Balance</title>
+                <style>
+                    body { 
+                        font-family: monospace;
+                        font-size: 14px;
+                        width: 57mm;
+                        margin: 0;
+                        padding: 1mm;
+                    }
+                    .text-center { text-align: center; }
+                    .text-right { text-align: right; }
+                    .mb-1 { margin-bottom: 0.5mm; }
+                    .mt-1 { margin-top: 0.5mm; }
+                    .border-top { 
+                        border-top: 1px dashed #000;
+                        margin-top: 1mm;
+                        padding-top: 1mm;
+                    }
+                    @media print {
+                        @page {
+                            margin: 0;
+                            size: 57mm auto;
+                        }
+                        body {
+                            width: 57mm;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                ${modalContent.innerHTML}
+            </body>
+        </html>
+    `);
+    
+    ventana.document.close();
+    ventana.print();
 }
   
