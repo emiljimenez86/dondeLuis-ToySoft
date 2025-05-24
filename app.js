@@ -10,6 +10,7 @@ let contadorDomicilios = 0; // Contador de pedidos a domicilio
 let contadorRecoger = 0; // Contador de pedidos para recoger
 let historialVentas = []; // Almacena el historial de ventas
 let historialCocina = []; // Almacena el historial de órdenes de cocina
+let ultimaFechaContadores = null; // Fecha del último contador
 
 // Variable global para la ventana de impresión
 let ventanaImpresion = null;
@@ -26,8 +27,9 @@ function guardarClientes() {
 
 // Función para guardar contadores en localStorage
 function guardarContadores() {
-  localStorage.setItem('contadorDomicilios', contadorDomicilios);
-  localStorage.setItem('contadorRecoger', contadorRecoger);
+  localStorage.setItem('contadorDomicilios', contadorDomicilios.toString());
+  localStorage.setItem('contadorRecoger', contadorRecoger.toString());
+  localStorage.setItem('ultimaFechaContadores', ultimaFechaContadores);
 }
 
 // Función para guardar historial de ventas
@@ -2738,5 +2740,26 @@ function imprimirBalanceModal() {
     
     ventana.document.close();
     ventana.print();
+}
+
+// Función para verificar y reiniciar contadores si es un nuevo día
+function verificarContadoresDiarios() {
+  const fechaActual = new Date().toLocaleDateString();
+  
+  // Si no hay fecha guardada o es un nuevo día, reiniciar contadores
+  if (!ultimaFechaContadores || ultimaFechaContadores !== fechaActual) {
+    contadorDomicilios = 0;
+    contadorRecoger = 0;
+    ultimaFechaContadores = fechaActual;
+    guardarContadores();
+  }
+}
+
+// Función para cargar contadores desde localStorage
+function cargarContadores() {
+  contadorDomicilios = parseInt(localStorage.getItem('contadorDomicilios')) || 0;
+  contadorRecoger = parseInt(localStorage.getItem('contadorRecoger')) || 0;
+  ultimaFechaContadores = localStorage.getItem('ultimaFechaContadores');
+  verificarContadoresDiarios();
 }
   
