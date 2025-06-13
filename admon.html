@@ -275,6 +275,40 @@
                 </div>
             </div>
         </div>
+
+        <!-- Gestión del Negocio -->
+        <div class="container mt-5 mb-4">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h5 class="mb-0">Datos del Negocio</h5>
+                </div>
+                <div class="card-body">
+                    <form id="formNegocio">
+                        <div class="mb-3">
+                            <label for="nombreNegocio" class="form-label">Nombre del Negocio</label>
+                            <input type="text" class="form-control bg-dark text-white" id="nombreNegocio">
+                        </div>
+                        <div class="mb-3">
+                            <label for="nitNegocio" class="form-label">NIT o Cédula</label>
+                            <input type="text" class="form-control bg-dark text-white" id="nitNegocio">
+                        </div>
+                        <div class="mb-3">
+                            <label for="direccionNegocio" class="form-label">Dirección</label>
+                            <input type="text" class="form-control bg-dark text-white" id="direccionNegocio">
+                        </div>
+                        <div class="mb-3">
+                            <label for="correoNegocio" class="form-label">Correo Electrónico</label>
+                            <input type="text" class="form-control bg-dark text-white" id="correoNegocio">
+                        </div>
+                        <div class="mb-3">
+                            <label for="telefonoNegocio" class="form-label">Teléfono</label>
+                            <input type="text" class="form-control bg-dark text-white" id="telefonoNegocio">
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="guardarDatosNegocio()">Guardar Datos</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Cierre Diario -->

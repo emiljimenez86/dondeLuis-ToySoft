@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>POS Donde Luis Restaurante</title>
+  <title>SoftToy POS</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <meta name="theme-color" content="#0dcaf0">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -227,27 +228,21 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
           <!-- Header con logo y título -->
           <div class="d-flex align-items-center mb-4" style="gap: 20px;">
-            <img src="image/logo-ToySoft.png" alt="Logo" style="height: 80px; width: 80px; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.12); object-fit: cover;">
-            <h1 class="nombreRestaurante mb-0">POS Donde Luis Restaurante</h1>
+            <img src="image/logo-ToySoft.png" alt="Logo" style="height: 80px; width: 80px; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 1.5px 0 #fff inset; background: linear-gradient(145deg, #222 0%, #444 100%); border: 2px solid #0dcaf0; object-fit: cover;">
+            <h1 class="nombreRestaurante mb-0">ToySoft POS</h1>
           </div>
           <div class="d-flex gap-2">
-            <a href="historial.html" class="btn btn-info">
-              <i class="fas fa-history"></i> Historial
-            </a>
-            <a href="gastos.html" class="btn btn-warning">Gastos Diarios</a>
-            <a href="inventario.html" class="btn btn-success">
-              <i class="fas fa-boxes"></i> Inventario
-            </a>
-            <button class="btn btn-outline-info" onclick="mostrarModalCierreDiario()">
-              <i class="fas fa-calculator"></i> Cierre Diario
-            </button>
-            <a href="index.html" class="btn btn-outline-light">Volver al Inicio</a>
+            <a href="historial.html" class="btn btn-info"><i class="fas fa-history"></i> Historial</a>
+            <a href="gastos.html" class="btn btn-warning"><i class="fas fa-coins"></i> Gastos Diarios</a>
+            <a href="inventario.html" class="btn btn-success"><i class="fas fa-boxes"></i> Inventario</a>
+            <button class="btn btn-primary" onclick="mostrarModalCotizaciones()"><i class="fas fa-file-invoice"></i> Cotizaciones</button>
+            <button class="btn btn-outline-info" onclick="mostrarModalCierreDiario()"><i class="fas fa-calculator"></i> Cierre Diario</button>
+            <a href="index.html" class="btn btn-outline-light"><i class="fas fa-home"></i> Volver al Inicio</a>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Sección de Mesas Activas -->
     <div class="row mb-4">
       <div class="col-12">
         <div class="card bg-dark">
@@ -257,17 +252,11 @@
               <div class="input-group" style="max-width: 300px;">
                 <input type="number" id="nuevaMesa" class="form-control bg-dark text-white border-light" 
                        placeholder="N° de mesa" min="1">
-                <button class="btn btn-warning" onclick="crearNuevaMesa()">
-                  <i class="fas fa-plus"></i> Nueva Mesa
-                </button>
+                <button class="btn btn-warning" onclick="crearNuevaMesa()"><i class="fas fa-plus"></i> Nueva Mesa</button>
               </div>
               <div class="d-flex gap-2">
-                <button class="btn btn-success" onclick="crearPedidoDomicilio()">
-                  <i class="fas fa-motorcycle"></i> Domicilio
-                </button>
-                <button class="btn btn-primary" onclick="crearPedidoRecoger()">
-                  <i class="fas fa-shopping-bag"></i> Recoger
-                </button>
+                <button class="btn btn-success" onclick="crearPedidoDomicilio()"><i class="fas fa-motorcycle"></i> Domicilio</button>
+                <button class="btn btn-primary" onclick="crearPedidoRecoger()"><i class="fas fa-shopping-bag"></i> Recoger</button>
               </div>
             </div>
             <div class="mesas-container" id="mesasContainer">
@@ -278,10 +267,10 @@
       </div>
     </div>
 
-    <div class="row g-4">
+    <div class="row">
       <!-- Categorías a la izquierda -->
       <div class="col-12 col-lg-3">
-        <div class="card bg-dark">
+        <div class="card bg-dark h-100">
           <div class="card-body">
             <h4 class="text-info mb-3">Categorías</h4>
             <div id="categorias" class="d-grid gap-2"></div>
@@ -291,26 +280,19 @@
 
       <!-- Orden actual en el centro -->
       <div class="col-12 col-lg-9">
-        <div class="card bg-dark">
-          <div class="card-body">
+        <div class="card bg-dark h-100">
+          <div class="card-body d-flex flex-column">
             <h4 class="text-info mb-3">Orden Actual - Mesa <span id="mesaActual">-</span></h4>
-            <div class="table-responsive">
-              <table class="table table-bordered table-dark table-striped" id="ordenTabla">
-                <thead class="table-secondary text-dark">
-                  <tr>
-                    <th>Producto</th>
-                    <th>Cant</th>
-                    <th>Precio</th>
-                    <th>Total</th>
-                    <th>Detalles</th>
-                    <th>Eliminar</th>
-                  </tr>
-                </thead>
-                <tbody id="ordenCuerpo"></tbody>
-              </table>
+            
+            <!-- Botones de acción fijos en la parte superior -->
+            <div class="d-flex gap-2 mb-3">
+              <button class="btn btn-danger" onclick="eliminarPedido()"><i class="fas fa-trash"></i> Eliminar Pedido</button>
+              <button class="btn btn-primary" onclick="enviarACocina()"><i class="fas fa-utensils"></i> Enviar a Cocina</button>
+              <button class="btn btn-success" onclick="mostrarModalPago()"><i class="fas fa-receipt"></i> Generar Recibo</button>
             </div>
 
-            <div class="row g-3 mt-3">
+            <!-- Inputs de propina, descuento y domicilio -->
+            <div class="row g-3 mb-3">
               <div class="col-12 col-md-4">
                 <label class="form-label fw-bold">Propina</label>
                 <input type="number" id="propina" class="form-control bg-dark text-white border-light" 
@@ -328,22 +310,27 @@
               </div>
             </div>
 
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mt-4">
-              <div>
-                <h5 class="mb-3 mb-md-0">Total: <span id="totalOrden">$0</span></h5>
-                <div id="desgloseTotal" class="small text-muted"></div>
-              </div>
-              <div class="d-flex gap-2 mt-3 mt-md-0">
-                <button class="btn btn-danger" onclick="eliminarPedido()">
-                  <i class="fas fa-trash"></i> Eliminar Pedido
-                </button>
-                <button class="btn btn-primary" onclick="enviarACocina()">
-                  <i class="fas fa-utensils"></i> Enviar a Cocina
-                </button>
-                <button class="btn btn-success" onclick="mostrarModalPago()">
-                  <i class="fas fa-receipt"></i> Generar Recibo
-                </button>
-              </div>
+            <!-- Tabla de orden con scroll -->
+            <div class="table-responsive flex-grow-1" style="max-height: 400px; overflow-y: auto;">
+              <table class="table table-bordered table-dark table-striped" id="ordenTabla">
+                <thead class="table-secondary text-dark sticky-top">
+                  <tr>
+                    <th>Producto</th>
+                    <th>Cant</th>
+                    <th>Precio</th>
+                    <th>Total</th>
+                    <th>Detalles</th>
+                    <th>Eliminar</th>
+                  </tr>
+                </thead>
+                <tbody id="ordenCuerpo"></tbody>
+              </table>
+            </div>
+
+            <!-- Total fijo en la parte inferior -->
+            <div class="mt-3">
+              <h2 class="mb-2 fw-bold" style="font-size: 2.5rem;">Total: <span id="totalOrden" class="text-success">$0</span></h2>
+              <div id="desgloseTotal" class="small text-muted"></div>
             </div>
           </div>
         </div>
@@ -490,7 +477,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-primary" onclick="procesarPago()">Confirmar Pago</button>
+          <button type="button" class="btn btn-primary" onclick="procesarPago()"><i class="fas fa-check"></i> Confirmar Pago</button>
         </div>
       </div>
     </div>
@@ -517,9 +504,7 @@
           <div class="mb-3">
             <h6>Gastos del Día</h6>
             <div>Total Gastos: <span id="totalGastosHoy">$ 0</span></div>
-            <button class="btn btn-info mt-2" onclick="mostrarModalGastos()">
-              <i class="fas fa-receipt"></i> Gestionar Gastos
-            </button>
+            <button class="btn btn-info mt-2" onclick="mostrarModalGastos()"><i class="fas fa-receipt"></i> Gestionar Gastos</button>
           </div>
           
           <div class="mb-3">
@@ -533,6 +518,25 @@
               <!-- Los créditos pendientes se mostrarán aquí -->
             </div>
           </div>
+
+          <div class="mb-3">
+            <h6>Información del Cierre</h6>
+            <div class="mb-2">
+              <label class="form-label fw-bold fs-6">Nombre de quien realiza el cierre:</label>
+              <input type="text" class="form-control bg-dark text-white border-light" id="nombreCierre" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label fw-bold fs-6">Nombre de quien recibe la caja:</label>
+              <input type="text" class="form-control bg-dark text-white border-light" id="nombreRecibe" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label fw-bold fs-6">Monto base para la caja:</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control bg-dark text-white border-light" id="montoBaseCaja" required>
+              </div>
+            </div>
+          </div>
           
           <div class="mb-3">
             <label class="form-label">Detalles Adicionales</label>
@@ -541,13 +545,8 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-info" onclick="imprimirBalanceDiario()">
-            <i class="fas fa-print"></i> Imprimir Balance
-          </button>
-          <button type="button" class="btn btn-success" onclick="exportarCierresDiariosExcel()">
-            <i class="fas fa-file-excel"></i> Exportar a Excel
-          </button>
-          <button type="button" class="btn btn-primary" onclick="guardarCierreDiario()">Guardar Cierre</button>
+          <button type="button" class="btn btn-success" onclick="exportarCierresDiariosExcel()"><i class="fas fa-file-excel"></i> Exportar a Excel</button>
+          <button type="button" class="btn btn-primary" onclick="guardarCierreDiario()">Guardar e imprimir cierre</button>
         </div>
       </div>
     </div>
@@ -613,11 +612,187 @@
     </div>
   </div>
 
+  <!-- Modal de Cotizaciones -->
+  <div class="modal fade" id="modalCotizaciones" tabindex="-1" aria-labelledby="modalCotizacionesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content bg-dark text-white">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalCotizacionesLabel">Cotizaciones</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <div class="input-group">
+              <input type="text" id="buscarCotizacion" class="form-control bg-dark text-white" placeholder="Buscar por cliente o fecha...">
+              <button class="btn btn-outline-light" type="button" onclick="buscarCotizaciones()">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-dark table-striped">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>Total</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tablaCotizaciones">
+                <!-- Las cotizaciones se cargarán aquí -->
+              </tbody>
+            </table>
+          </div>
+          <div class="d-flex justify-content-end mt-2">
+            <button class="btn btn-info" onclick="imprimirCotizacionSeleccionada()">
+              <i class="fas fa-print"></i> Imprimir seleccionada
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" onclick="mostrarModalNuevaCotizacion()">
+            <i class="fas fa-plus"></i> Nueva Cotización
+          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Nueva Cotización -->
+  <div class="modal fade" id="modalNuevaCotizacion" tabindex="-1" aria-labelledby="modalNuevaCotizacionLabel" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content bg-dark text-white">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalNuevaCotizacionLabel">Nueva Cotización</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="clienteCotizacion" class="form-label">Cliente</label>
+              <select class="form-select bg-dark text-white border-light" id="clienteCotizacion">
+                <option value="">Seleccionar cliente</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="fechaCotizacion" class="form-label">Fecha</label>
+              <input type="date" class="form-control bg-dark text-white border-light" id="fechaCotizacion">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col-12">
+              <div class="card bg-dark border-light">
+                <div class="card-header">
+                  <h6 class="mb-0">Agregar Producto</h6>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-4">
+                      <label for="buscarProducto" class="form-label">Buscar Producto</label>
+                      <div class="input-group">
+                        <input type="text" class="form-control bg-dark text-white border-light" id="buscarProducto" placeholder="Escriba para buscar..." onkeyup="buscarProductosCotizacion()">
+                        <button class="btn btn-outline-light" type="button" onclick="toggleProductoManual()">
+                          <i class="fas fa-pen"></i>
+                        </button>
+                      </div>
+                      <div id="resultadosBusqueda" class="list-group mt-2" style="max-height: 200px; overflow-y: auto; display: none;">
+                      </div>
+                      <input type="text" class="form-control mt-2 bg-dark text-white border-light" id="productoManual" style="display: none;" placeholder="Escribir nombre del producto">
+                    </div>
+                    <div class="col-md-2">
+                      <label for="cantidadItem" class="form-label">Cantidad</label>
+                      <input type="number" class="form-control bg-dark text-white border-light" id="cantidadItem" min="1" value="1">
+                    </div>
+                    <div class="col-md-2">
+                      <label for="precioItem" class="form-label">Precio</label>
+                      <input type="number" class="form-control bg-dark text-white border-light" id="precioItem" min="0" placeholder="0">
+                    </div>
+                  </div>
+                  <div class="row mt-3">
+                    <div class="col-12">
+                      <button class="btn btn-primary" onclick="agregarItemCotizacion()">
+                        <i class="fas fa-plus"></i> Agregar Producto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive mt-3">
+            <table class="table table-dark table-striped">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cantidad</th>
+                  <th>Precio</th>
+                  <th>Subtotal</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="itemsCotizacion">
+                <!-- Los items se agregarán aquí -->
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                  <td colspan="2"><strong id="totalCotizacion">$0</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="guardarCotizacion()">
+            <i class="fas fa-save"></i> Guardar Cotización
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Agregar Item -->
+  <div class="modal fade" id="modalAgregarItem" tabindex="-1" aria-labelledby="modalAgregarItemLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalAgregarItemLabel">Agregar Item</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="productoItem" class="form-label">Producto</label>
+            <input type="text" class="form-control" id="productoItem" placeholder="Nombre del producto">
+          </div>
+          <div class="mb-3">
+            <label for="cantidadItem" class="form-label">Cantidad</label>
+            <input type="number" class="form-control" id="cantidadItem" min="1" value="1">
+          </div>
+          <div class="mb-3">
+            <label for="precioItem" class="form-label">Precio</label>
+            <input type="number" class="form-control" id="precioItem" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="guardarItemCotizacion(
+            document.getElementById('productoItem').value,
+            document.getElementById('cantidadItem').value,
+            document.getElementById('precioItem').value
+          )">Agregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <script src="seguridad.js"></script>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <script src="app.js"></script>
+  <script src="cotizaciones.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       verificarAcceso();

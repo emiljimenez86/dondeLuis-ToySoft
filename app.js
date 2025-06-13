@@ -12,8 +12,15 @@ let historialVentas = []; // Almacena el historial de ventas
 let historialCocina = []; // Almacena el historial de órdenes de cocina
 let ultimaFechaContadores = null; // Fecha del último contador
 
+// Variables globales para cotizaciones
+let cotizaciones = [];
+let modoProductoManual = false;
+let productosFiltrados = [];
+
 // Variable global para la ventana de impresión
 let ventanaImpresion = null;
+
+let cotizacionEditandoId = null;
 
 // Función para guardar productos en localStorage
 function guardarProductos() {
@@ -42,7 +49,6 @@ function guardarHistorialVentas() {
     }
     // Guardar en ambas claves para sincronizar
     localStorage.setItem('historialVentas', JSON.stringify(historialVentas));
-    localStorage.setItem('ventas', JSON.stringify(historialVentas)); // Sincroniza aquí
     console.log('Historial de ventas guardado:', historialVentas);
     // Verificar que se guardó correctamente
     const guardado = localStorage.getItem('historialVentas');
@@ -61,62 +67,118 @@ function guardarHistorialCocina() {
 // Función para cargar datos desde localStorage
 function cargarDatos() {
   try {
-    const historialVentasGuardado = localStorage.getItem('historialVentas');
-    console.log('Datos guardados en localStorage:', historialVentasGuardado);
+    console.log('Iniciando carga de datos...');
     
+    // Cargar mesas activas primero
+    const mesasGuardadas = localStorage.getItem('mesasActivas');
+    if (mesasGuardadas) {
+      try {
+        const mesasArray = JSON.parse(mesasGuardadas);
+        mesasActivas = new Map(mesasArray);
+        console.log('Mesas activas cargadas:', mesasActivas);
+        
+        // Verificar que cada mesa tenga sus productos
+        mesasActivas.forEach((pedido, mesaId) => {
+          if (!pedido.items || !Array.isArray(pedido.items)) {
+            console.error(`Mesa ${mesaId} no tiene items o no es un array:`, pedido);
+            pedido.items = [];
+          }
+        });
+      } catch (error) {
+        console.error('Error al parsear mesas activas:', error);
+        mesasActivas = new Map();
+      }
+    }
+
+    // Cargar historial de ventas
+    const historialVentasGuardado = localStorage.getItem('historialVentas');
     if (historialVentasGuardado) {
-      historialVentas = JSON.parse(historialVentasGuardado);
-      console.log('Historial de ventas cargado:', historialVentas);
-      
-      // Verificar que se cargó correctamente
-      if (!Array.isArray(historialVentas)) {
-        console.error('Error: historialVentas no es un array después de cargar');
+      try {
+        historialVentas = JSON.parse(historialVentasGuardado);
+        if (!Array.isArray(historialVentas)) {
+          console.error('Error: historialVentas no es un array');
+          historialVentas = [];
+        }
+      } catch (error) {
+        console.error('Error al parsear historial de ventas:', error);
         historialVentas = [];
       }
-    } else {
-      console.log('No se encontró historial de ventas en localStorage');
-      historialVentas = [];
     }
     
-    // Cargar otros datos...
+    // Cargar otros datos
     const productosGuardados = localStorage.getItem('productos');
     const categoriasGuardadas = localStorage.getItem('categorias');
-    const mesasGuardadas = localStorage.getItem('mesasActivas');
     const ordenesCocinaGuardadas = localStorage.getItem('ordenesCocina');
     const clientesGuardados = localStorage.getItem('clientes');
     const contadorDomiciliosGuardado = localStorage.getItem('contadorDomicilios');
     const contadorRecogerGuardado = localStorage.getItem('contadorRecoger');
     const historialCocinaGuardado = localStorage.getItem('historialCocina');
+    const cotizacionesGuardadas = localStorage.getItem('cotizaciones');
     
     if (productosGuardados) {
-      productos = JSON.parse(productosGuardados);
+      try {
+        productos = JSON.parse(productosGuardados);
+      } catch (error) {
+        console.error('Error al parsear productos:', error);
+        productos = [];
+      }
     }
     
     if (categoriasGuardadas) {
-      categorias = JSON.parse(categoriasGuardadas);
-    }
-
-    if (mesasGuardadas) {
-      mesasActivas = new Map(JSON.parse(mesasGuardadas));
+      try {
+        categorias = JSON.parse(categoriasGuardadas);
+      } catch (error) {
+        console.error('Error al parsear categorías:', error);
+        categorias = [];
+      }
     }
 
     if (ordenesCocinaGuardadas) {
-      ordenesCocina = new Map(JSON.parse(ordenesCocinaGuardadas));
+      try {
+        const ordenesArray = JSON.parse(ordenesCocinaGuardadas);
+        ordenesCocina = new Map(ordenesArray);
+        console.log('Órdenes de cocina cargadas:', ordenesCocina);
+        
+        // Restaurar el estado de los productos en cocina en las mesas activas
+        ordenesCocina.forEach((productos, mesaId) => {
+          if (mesasActivas.has(mesaId)) {
+            const pedido = mesasActivas.get(mesaId);
+            if (!pedido.items) {
+              pedido.items = [];
+            }
+            
+            // Asegurarse de que todos los productos de cocina estén en la mesa
+            productos.forEach(productoCocina => {
+              const productoExistente = pedido.items.find(item => item.id === productoCocina.id);
+              if (productoExistente) {
+                productoExistente.estado = 'en_cocina';
+              } else {
+                // Si el producto no existe en la mesa, agregarlo
+                pedido.items.push({
+                  ...productoCocina,
+                  estado: 'en_cocina'
+                });
+              }
+            });
+          }
+        });
+      } catch (error) {
+        console.error('Error al parsear órdenes de cocina:', error);
+        ordenesCocina = new Map();
+      }
     }
 
     if (clientesGuardados) {
       try {
         clientes = JSON.parse(clientesGuardados);
         if (!Array.isArray(clientes)) {
-          console.error('Error: clientes no es un array después de cargar');
+          console.error('Error: clientes no es un array');
           clientes = [];
         }
       } catch (error) {
         console.error('Error al parsear clientes:', error);
         clientes = [];
       }
-    } else {
-      clientes = [];
     }
 
     if (contadorDomiciliosGuardado) {
@@ -128,20 +190,51 @@ function cargarDatos() {
     }
 
     if (historialCocinaGuardado) {
-      historialCocina = JSON.parse(historialCocinaGuardado);
+      try {
+        historialCocina = JSON.parse(historialCocinaGuardado);
+        if (!Array.isArray(historialCocina)) {
+          console.error('Error: historialCocina no es un array');
+          historialCocina = [];
+        }
+      } catch (error) {
+        console.error('Error al parsear historial de cocina:', error);
+        historialCocina = [];
+      }
+    }
+
+    if (cotizacionesGuardadas) {
+      try {
+        cotizaciones = JSON.parse(cotizacionesGuardadas);
+      } catch (error) {
+        console.error('Error al parsear cotizaciones:', error);
+        cotizaciones = [];
+      }
     }
     
+    console.log('Datos cargados exitosamente');
+    console.log('Estado final de mesas:', Array.from(mesasActivas.entries()));
     mostrarProductos();
     actualizarMesasActivas();
   } catch (error) {
-    console.error('Error al cargar datos:', error);
+    console.error('Error general al cargar datos:', error);
   }
 }
 
 // Función para guardar el estado de las mesas
 function guardarMesas() {
-  localStorage.setItem('mesasActivas', JSON.stringify(Array.from(mesasActivas.entries())));
-  localStorage.setItem('ordenesCocina', JSON.stringify(Array.from(ordenesCocina.entries())));
+  try {
+    console.log('Guardando estado de mesas...');
+    const mesasArray = Array.from(mesasActivas.entries());
+    const ordenesCocinaArray = Array.from(ordenesCocina.entries());
+    
+    localStorage.setItem('mesasActivas', JSON.stringify(mesasArray));
+    localStorage.setItem('ordenesCocina', JSON.stringify(ordenesCocinaArray));
+    
+    console.log('Estado de mesas guardado exitosamente');
+  } catch (error) {
+    console.error('Error al guardar estado de mesas:', error);
+    alert('Error al guardar el estado de las mesas. Por favor, intente nuevamente.');
+  }
 }
 
 // Función para actualizar la vista de mesas activas
@@ -1350,6 +1443,11 @@ function procesarPago() {
   historialVentas.push(factura);
   guardarHistorialVentas();
 
+  // Agregar la venta a la lista de ventas activas (para el cierre diario)
+  let ventasActuales = JSON.parse(localStorage.getItem('ventas')) || [];
+  ventasActuales.push(factura);
+  localStorage.setItem('ventas', JSON.stringify(ventasActuales));
+
   // Obtener la ventana de impresión
   const ventana = obtenerVentanaImpresion();
   if (!ventana) {
@@ -1365,9 +1463,9 @@ function procesarPago() {
     if (pedido.cliente) {
       infoAdicional = `
         <div class="border-top">
-          <div class="mb-1">Cliente: ${pedido.cliente}</div>
-          <div class="mb-1">Dir: ${pedido.direccion || 'No especificada'}</div>
-          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
+          <div class="mb-1"><strong>Cliente:</strong> <strong>${pedido.cliente}</strong></div>
+          <div class="mb-1"><strong>Dir:</strong> <strong>${pedido.direccion || 'No especificada'}</strong></div>
+          <div class="mb-1"><strong>Tel:</strong> <strong>${pedido.telefono || 'No especificado'}</strong></div>
         </div>
       `;
     }
@@ -1376,9 +1474,9 @@ function procesarPago() {
     if (pedido.cliente) {
       infoAdicional = `
         <div class="border-top">
-          <div class="mb-1">Cliente: ${pedido.cliente}</div>
-          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
-          ${pedido.horaRecoger ? `<div class="mb-1">Hora: ${pedido.horaRecoger}</div>` : ''}
+          <div class="mb-1"><strong>Cliente:</strong> <strong>${pedido.cliente}</strong></div>
+          <div class="mb-1"><strong>Tel:</strong> <strong>${pedido.telefono || 'No especificado'}</strong></div>
+          ${pedido.horaRecoger ? `<div class="mb-1"><strong>Hora:</strong> <strong>${pedido.horaRecoger}</strong></div>` : ''}
         </div>
       `;
     }
@@ -1432,7 +1530,7 @@ function procesarPago() {
     
     <div class="border-top">
       <div class="mb-1">Método de Pago: ${metodoPago}</div>
-      ${metodoPago === 'efectivo' ? `
+      ${metodoPago === 'efectivo' || metodoPago === 'mixto' ? `
         <div class="mb-1">Recibido en Efectivo: $ ${formatearNumero(factura.montoRecibido)}</div>
         <div class="mb-1">Cambio: $ ${formatearNumero(factura.cambio)}</div>
       ` : ''}
@@ -1447,6 +1545,22 @@ function procesarPago() {
         <div class="mb-1">Transferencia: $ ${formatearNumero(factura.montoTransferencia)}</div>
       ` : ''}
     </div>
+    
+    ${(() => {
+      const datosNegocio = JSON.parse(localStorage.getItem('datosNegocio'));
+      if (datosNegocio && Object.values(datosNegocio).some(valor => valor)) {
+        return `
+          <div class="border-top mt-1">
+            ${datosNegocio.nombre ? `<div><strong>${datosNegocio.nombre}</strong></div>` : ''}
+            ${datosNegocio.nit ? `<div>NIT/Cédula: ${datosNegocio.nit}</div>` : ''}
+            ${datosNegocio.direccion ? `<div>Dirección: ${datosNegocio.direccion}</div>` : ''}
+            ${datosNegocio.correo ? `<div>Correo: ${datosNegocio.correo}</div>` : ''}
+            ${datosNegocio.telefono ? `<div>Teléfono: ${datosNegocio.telefono}</div>` : ''}
+          </div>
+        `;
+      }
+      return '';
+    })()}
     
     <div class="text-center mt-1">
       <div class="border-top">¡Gracias por su compra!</div>
@@ -1508,9 +1622,9 @@ function reimprimirFactura(ventaId) {
       if (venta.cliente) {
         infoAdicional = `
           <div class="border-top">
-            <div class="mb-1">Cliente: ${venta.cliente}</div>
-            <div class="mb-1">Dir: ${venta.direccion}</div>
-            <div class="mb-1">Tel: ${venta.telefono}</div>
+            <div class="mb-1"><strong>Cliente:</strong> <strong>${venta.cliente}</strong></div>
+            <div class="mb-1"><strong>Dir:</strong> <strong>${venta.direccion}</strong></div>
+            <div class="mb-1"><strong>Tel:</strong> <strong>${venta.telefono}</strong></div>
           </div>
         `;
       }
@@ -1519,9 +1633,9 @@ function reimprimirFactura(ventaId) {
       if (venta.cliente) {
         infoAdicional = `
           <div class="border-top">
-            <div class="mb-1">Cliente: ${venta.cliente}</div>
-            <div class="mb-1">Tel: ${venta.telefono}</div>
-            <div class="mb-1">Hora: ${venta.horaRecoger}</div>
+            <div class="mb-1"><strong>Cliente:</strong> <strong>${venta.cliente}</strong></div>
+            <div class="mb-1"><strong>Tel:</strong> <strong>${venta.telefono}</strong></div>
+            ${venta.horaRecoger ? `<div class="mb-1"><strong>Hora:</strong> <strong>${venta.horaRecoger}</strong></div>` : ''}
           </div>
         `;
       }
@@ -1714,93 +1828,136 @@ function mostrarModalCierreDiario() {
 
 function guardarCierreDiario() {
     try {
-        const detalles = document.getElementById('detallesCierre').value;
-        const fecha = new Date().toLocaleDateString();
-        
-        // Obtener datos actuales
-        const cierres = JSON.parse(localStorage.getItem('cierresDiarios')) || [];
-        
+        // Validar campos requeridos
+        const nombreCierre = document.getElementById('nombreCierre').value.trim();
+        const nombreRecibe = document.getElementById('nombreRecibe').value.trim();
+        const montoBaseCaja = parseFloat(document.getElementById('montoBaseCaja').value) || 0;
+
+        if (!nombreCierre || !nombreRecibe || montoBaseCaja <= 0) {
+            alert('Por favor complete todos los campos requeridos');
+            return;
+        }
+
+        // Mostrar confirmación
+        const confirmacion = confirm(
+            '¿Está seguro de realizar el cierre?\n\n' +
+            'Se realizarán las siguientes acciones:\n' +
+            '- Se reiniciarán todas las ventas\n' +
+            '- Se reiniciarán todos los gastos\n' +
+            '- Se reiniciarán los contadores de delivery y recoger\n' +
+            '- Se limpiarán todas las mesas activas\n\n' +
+            'Esta acción no se puede deshacer.'
+        );
+
+        if (!confirmacion) {
+            return;
+        }
+
         // Obtener ventas del día
+        const ventas = JSON.parse(localStorage.getItem('ventas')) || [];
         const hoy = new Date();
-        const hoyStr = hoy.toLocaleDateString();
-        const ventasHoy = historialVentas.filter(v => {
-            try {
-                const fechaVenta = new Date(v.fecha);
-                return fechaVenta.toLocaleDateString() === hoyStr;
-            } catch (error) {
-                console.error('Error al procesar fecha de venta:', error);
-                return false;
-            }
+        const hoyStr = hoy.toISOString().slice(0, 10);
+        const ventasHoy = ventas.filter(v => {
+            const fechaVenta = new Date(v.fecha);
+            const fechaVentaStr = fechaVenta.toISOString().slice(0, 10);
+            return fechaVentaStr === hoyStr;
         });
-        
+
         // Calcular totales
-        const totalVentas = ventasHoy.reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalEfectivo = ventasHoy.filter(v => v.metodoPago === 'efectivo')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalTransferencia = ventasHoy.filter(v => v.metodoPago === 'transferencia')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalTarjeta = ventasHoy.filter(v => v.metodoPago === 'tarjeta')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        const totalCredito = ventasHoy.filter(v => v.metodoPago === 'credito')
-            .reduce((sum, v) => sum + (v.total || 0), 0);
-        
+        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
+        ventasHoy.forEach(v => {
+            const total = parseFloat(v.total) || 0;
+            const metodo = (v.metodoPago || '').toLowerCase();
+            if (metodo === 'mixto') {
+                const efectivoMixto = parseFloat(v.montoRecibido) || 0;
+                const transferenciaMixto = parseFloat(v.montoTransferencia) || 0;
+                totalMixto += total;
+                totalEfectivo += efectivoMixto;
+                totalTransferencia += transferenciaMixto;
+            } else {
+                switch (metodo) {
+                    case 'efectivo':
+                        totalEfectivo += total;
+                        break;
+                    case 'transferencia':
+                        totalTransferencia += total;
+                        break;
+                    case 'tarjeta':
+                        totalTarjeta += total;
+                        break;
+                    case 'crédito':
+                        totalCredito += total;
+                        break;
+                }
+            }
+            totalVentas += total;
+        });
+
         // Obtener gastos del día
         const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
         const gastosHoy = gastos.filter(g => {
-            try {
-                return new Date(g.fecha).toLocaleDateString() === hoyStr;
-            } catch (error) {
-                console.error('Error al procesar fecha de gasto:', error);
-                return false;
-            }
+            const fechaGasto = new Date(g.fecha);
+            const fechaGastoStr = fechaGasto.toISOString().slice(0, 10);
+            return fechaGastoStr === hoyStr;
         });
-        const totalGastos = gastosHoy.reduce((sum, g) => sum + (g.monto || 0), 0);
-        
+        const totalGastos = gastosHoy.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
+
         // Calcular balance final
-        const balanceFinal = totalVentas - totalCredito - totalGastos;
-        
-        // Crear nuevo cierre
-        const nuevoCierre = {
-            id: Date.now(),
-            fecha,
-            totalVentas,
-            totalEfectivo,
-            totalTransferencia,
-            totalTarjeta,
-            totalCredito,
-            totalGastos,
-            balanceFinal,
-            detalles,
-            creditosPendientes: ventasHoy.filter(v => v.metodoPago === 'credito').map(v => ({
-                cliente: v.cliente,
-                monto: v.total,
-                fecha: v.fecha
-            }))
+        const balanceFinal = totalVentas - totalGastos;
+
+        // Crear objeto de cierre
+        const cierre = {
+            fecha: hoy.toISOString(),
+            ventas: {
+                total: totalVentas,
+                efectivo: totalEfectivo,
+                transferencia: totalTransferencia,
+                tarjeta: totalTarjeta,
+                credito: totalCredito,
+                mixto: totalMixto
+            },
+            gastos: totalGastos,
+            balance: balanceFinal,
+            nombreCierre: nombreCierre,
+            nombreRecibe: nombreRecibe,
+            montoBaseCaja: montoBaseCaja,
+            detalles: document.getElementById('detallesCierre').value.trim()
         };
-        
-        // Verificar si ya existe un cierre para hoy
-        const cierreExistente = cierres.findIndex(c => c.fecha === fecha);
-        if (cierreExistente !== -1) {
-            if (!confirm('Ya existe un cierre para hoy. ¿Desea sobrescribirlo?')) {
-                return;
-            }
-            cierres[cierreExistente] = nuevoCierre;
-        } else {
-            cierres.push(nuevoCierre);
-        }
-        
-        // Guardar en localStorage
-        localStorage.setItem('cierresDiarios', JSON.stringify(cierres));
-        
-        // Cerrar modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalCierreDiario'));
-        modal.hide();
-        
-        // Mostrar mensaje de éxito
-        alert('Cierre diario guardado exitosamente');
+
+        // Guardar cierre en localStorage
+        const cierres = JSON.parse(localStorage.getItem('cierres')) || [];
+        cierres.push(cierre);
+        localStorage.setItem('cierres', JSON.stringify(cierres));
+
+        // Imprimir tirilla ANTES de reiniciar ventas y gastos
+        imprimirBalanceDiario();
+
+        // Reiniciar sistema
+        localStorage.setItem('ventas', JSON.stringify([]));
+        localStorage.setItem('gastos', JSON.stringify([]));
+        localStorage.setItem('contadorDelivery', '1');
+        localStorage.setItem('contadorRecoger', '1');
+        localStorage.setItem('mesasActivas', JSON.stringify([]));
+    
+        // REINICIO EXPLÍCITO DE CONTADORES GLOBALES Y FECHA
+        contadorDomicilios = 0;
+        contadorRecoger = 0;
+        ultimaFechaContadores = new Date().toLocaleDateString();
+        guardarContadores();
+    
+        // Refrescar variables globales y estado de la app
+        cargarDatos();
+    
+    // Cerrar modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalCierreDiario'));
+    modal.hide();
+    
+    // Mostrar mensaje de éxito
+    alert('Cierre diario guardado exitosamente');
+
     } catch (error) {
-        console.error('Error en guardarCierreDiario:', error);
-        alert('Error al guardar el cierre diario: ' + error.message);
+        console.error('Error al guardar cierre:', error);
+        alert('Error al guardar el cierre');
     }
 }
 
@@ -1907,80 +2064,50 @@ function imprimirBalanceDiario() {
         const totalGastos = gastosHoy.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
         // Calcular balance final
         const balanceFinal = totalVentas - totalGastos;
+
+        // Obtener información del cierre
+        const nombreCierre = document.getElementById('nombreCierre').value.trim();
+        const nombreRecibe = document.getElementById('nombreRecibe').value.trim();
+        const montoBaseCaja = parseFloat(document.getElementById('montoBaseCaja').value) || 0;
+        const detalles = document.getElementById('detallesCierre').value;
+
+        // Obtener información del negocio
+        const datosNegocio = JSON.parse(localStorage.getItem('datosNegocio'));
+
         // Crear ventana de impresión
         const ventana = obtenerVentanaImpresion();
+        let infoNegocio = '';
+        if (datosNegocio && (
+            datosNegocio.nombre || datosNegocio.nit || datosNegocio.direccion || datosNegocio.correo || datosNegocio.telefono
+        )) {
+            infoNegocio += '<div class="border-top mt-1">';
+            if (datosNegocio.nombre) infoNegocio += `<div><strong>${datosNegocio.nombre}</strong></div>`;
+            if (datosNegocio.nit) infoNegocio += `<div>NIT/Cédula: ${datosNegocio.nit}</div>`;
+            if (datosNegocio.direccion) infoNegocio += `<div>Dirección: ${datosNegocio.direccion}</div>`;
+            if (datosNegocio.correo) infoNegocio += `<div>Correo: ${datosNegocio.correo}</div>`;
+            if (datosNegocio.telefono) infoNegocio += `<div>Teléfono: ${datosNegocio.telefono}</div>`;
+            infoNegocio += '</div>';
+        }
+
         const contenido = `
             <html>
                 <head>
-                    <title>Balance Diario</title>
+                    <title>Cierre Diario</title>
                     <style>
-                        body { 
-                            font-family: monospace;
-                            font-size: 14px;
-                            width: 57mm;
-                            margin: 0;
-                            padding: 1mm;
-                        }
+                        body { font-family: monospace; font-size: 14px; width: 57mm; margin: 0; padding: 1mm; }
                         .text-center { text-align: center; }
                         .text-right { text-align: right; }
                         .mb-1 { margin-bottom: 0.5mm; }
                         .mt-1 { margin-top: 0.5mm; }
-                        .border-top { 
-                            border-top: 1px dashed #000;
-                            margin-top: 1mm;
-                            padding-top: 1mm;
-                        }
-                        .header {
-                            border-bottom: 1px dashed #000;
-                            padding-bottom: 1mm;
-                            margin-bottom: 1mm;
-                        }
-                        .total-row {
-                            font-weight: bold;
-                            font-size: 16px;
-                        }
-                        .botones-impresion {
-                            position: fixed;
-                            top: 10px;
-                            right: 10px;
-                            z-index: 1000;
-                            background: #fff;
-                            padding: 5px;
-                            border-radius: 5px;
-                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                        }
-                        .botones-impresion button {
-                            margin: 0 5px;
-                            padding: 5px 10px;
-                            background: #007bff;
-                            color: white;
-                            border: none;
-                            border-radius: 3px;
-                            cursor: pointer;
-                        }
-                        .botones-impresion button:hover {
-                            background: #0056b3;
-                        }
-                        .logo-container {
-                            text-align: center;
-                            margin-bottom: 2mm;
-                        }
-                        .logo-container img {
-                            max-width: 100%;
-                            max-height: 120px;
-                        }
-                        @media print {
-                            .botones-impresion {
-                                display: none;
-                            }
-                            @page {
-                                margin: 0;
-                                size: 57mm auto;
-                            }
-                            body {
-                                width: 57mm;
-                            }
-                        }
+                        .border-top { border-top: 1px dashed #000; margin-top: 1mm; padding-top: 1mm; }
+                        .header { border-bottom: 1px dashed #000; padding-bottom: 1mm; margin-bottom: 1mm; }
+                        .total-row { font-weight: bold; font-size: 16px; }
+                        .botones-impresion { position: fixed; top: 10px; right: 10px; z-index: 1000; background: #fff; padding: 5px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+                        .botones-impresion button { margin: 0 5px; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+                        .botones-impresion button:hover { background: #0056b3; }
+                        .logo-container { text-align: center; margin-bottom: 2mm; }
+                        .logo-container img { max-width: 100%; max-height: 120px; }
+                        @media print { .botones-impresion { display: none; } @page { margin: 0; size: 57mm auto; } body { width: 57mm; } }
                     </style>
                 </head>
                 <body>
@@ -1990,8 +2117,8 @@ function imprimirBalanceDiario() {
                     </div>
 
                     <div class="header text-center">
-                        <h2 style="margin: 0; font-size: 14px;">BALANCE DIARIO</h2>
-                        <div class="mb-1">${hoyStr}</div>
+                        <h2 style="margin: 0; font-size: 14px;">CIERRE DIARIO</h2>
+                        <div class="mb-1">${hoy.toLocaleDateString()}</div>
                     </div>
                     
                     <div class="border-top">
@@ -2024,8 +2151,9 @@ function imprimirBalanceDiario() {
                         `).join('') || '<div class="mb-1">No hay créditos pendientes</div>'}
                     </div>
                     
+                    ${infoNegocio}
                     <div class="text-center mt-1">
-                        <div class="border-top">¡Fin del Balance!</div>
+                        <div class="border-top">¡Fin del Cierre!</div>
                         <div class="border-top">ToySoft POS</div>
                     </div>
                 </body>
@@ -2033,6 +2161,7 @@ function imprimirBalanceDiario() {
         `;
         ventana.document.write(contenido);
         ventana.document.close();
+        // Eliminar cualquier llamada automática a print o close. Solo los botones en la vista previa lo harán.
     } catch (error) {
         console.error('Error al imprimir balance:', error);
         alert('Error al generar el balance');
@@ -2457,9 +2586,9 @@ function generarReciboPreliminar() {
     if (pedido.cliente) {
       infoAdicional = `
         <div class="border-top">
-          <div class="mb-1">Cliente: ${pedido.cliente}</div>
-          <div class="mb-1">Dir: ${pedido.direccion || 'No especificada'}</div>
-          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
+          <div class="mb-1"><strong>Cliente:</strong> <strong>${pedido.cliente}</strong></div>
+          <div class="mb-1"><strong>Dir:</strong> <strong>${pedido.direccion || 'No especificada'}</strong></div>
+          <div class="mb-1"><strong>Tel:</strong> <strong>${pedido.telefono || 'No especificado'}</strong></div>
         </div>
       `;
     }
@@ -2468,9 +2597,9 @@ function generarReciboPreliminar() {
     if (pedido.cliente) {
       infoAdicional = `
         <div class="border-top">
-          <div class="mb-1">Cliente: ${pedido.cliente}</div>
-          <div class="mb-1">Tel: ${pedido.telefono || 'No especificado'}</div>
-          ${pedido.horaRecoger ? `<div class="mb-1">Hora: ${pedido.horaRecoger}</div>` : ''}
+          <div class="mb-1"><strong>Cliente:</strong> <strong>${pedido.cliente}</strong></div>
+          <div class="mb-1"><strong>Tel:</strong> <strong>${pedido.telefono || 'No especificado'}</strong></div>
+          ${pedido.horaRecoger ? `<div class="mb-1"><strong>Hora:</strong> <strong>${pedido.horaRecoger}</strong></div>` : ''}
         </div>
       `;
     }
@@ -2761,5 +2890,1371 @@ function cargarContadores() {
   contadorRecoger = parseInt(localStorage.getItem('contadorRecoger')) || 0;
   ultimaFechaContadores = localStorage.getItem('ultimaFechaContadores');
   verificarContadoresDiarios();
+}
+
+// Funciones para manejar cotizaciones
+function mostrarModalCotizaciones() {
+  try {
+    actualizarTablaCotizaciones();
+    const modal = new bootstrap.Modal(document.getElementById('modalCotizaciones'));
+    modal.show();
+  } catch (error) {
+    console.error('Error al mostrar las cotizaciones:', error);
+    alert('Error al mostrar las cotizaciones');
+  }
+}
+
+// Función para mostrar el modal de nueva cotización
+function mostrarModalNuevaCotizacion() {
+  try {
+    // Verificar que el modal existe
+    const modalElement = document.getElementById('modalNuevaCotizacion');
+    if (!modalElement) {
+      throw new Error('El modal de nueva cotización no existe en el DOM');
+    }
+
+    // Inicializar arrays si no existen
+    if (!Array.isArray(window.itemsCotizacion)) {
+      window.itemsCotizacion = [];
+    }
+    if (!Array.isArray(window.productosFiltrados)) {
+      window.productosFiltrados = [];
+    }
+
+    // Verificar y establecer fecha actual
+    const fechaInput = document.getElementById('fechaCotizacion');
+    if (!fechaInput) {
+      throw new Error('El campo de fecha no existe');
+    }
+    const hoy = new Date();
+    fechaInput.value = hoy.toISOString().split('T')[0];
+
+    // Verificar y cargar clientes
+    const selectCliente = document.getElementById('clienteCotizacion');
+    if (!selectCliente) {
+      throw new Error('El selector de clientes no existe');
+    }
+    selectCliente.innerHTML = '<option value="">Seleccionar cliente</option>';
+    const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+    clientes.forEach(cliente => {
+      const option = document.createElement('option');
+      option.value = cliente.id;
+      option.textContent = cliente.nombre;
+      selectCliente.appendChild(option);
+    });
+
+    // Limpiar campos de búsqueda y resultados
+    const buscarProducto = document.getElementById('buscarProducto');
+    if (buscarProducto) {
+      buscarProducto.value = '';
+    }
+    const resultadosBusqueda = document.getElementById('resultadosBusqueda');
+    if (resultadosBusqueda) {
+      resultadosBusqueda.innerHTML = '';
+      resultadosBusqueda.style.display = 'none';
+    }
+    const productoManual = document.getElementById('productoManual');
+    if (productoManual) {
+      productoManual.value = '';
+      productoManual.style.display = 'none';
+    }
+
+    // Limpiar tabla de items
+    const tablaItems = document.getElementById('itemsCotizacion');
+    if (!tablaItems) {
+      throw new Error('La tabla de items no existe');
+    }
+    tablaItems.innerHTML = '';
+
+    // Actualizar total
+    actualizarTotalCotizacion();
+
+    // Cerrar el modal de cotizaciones primero
+    const modalCotizaciones = bootstrap.Modal.getInstance(document.getElementById('modalCotizaciones'));
+    if (modalCotizaciones) {
+      modalCotizaciones.hide();
+    }
+
+    // Mostrar el modal de nueva cotización
+    const modal = new bootstrap.Modal(modalElement, {
+      backdrop: 'static',
+      keyboard: false
+    });
+    modal.show();
+
+    // Asegurar que el modal esté por encima
+    modalElement.style.zIndex = '1060';
+
+    // Cargar productos iniciales
+    filtrarProductosCotizacion();
+  } catch (error) {
+    console.error('Error detallado:', error);
+    alert(`Error al mostrar el formulario de nueva cotización: ${error.message}`);
+  }
+}
+
+function agregarItemCotizacion() {
+  try {
+    const producto = document.getElementById('productoManual').style.display === 'none' 
+      ? document.getElementById('buscarProducto').value
+      : document.getElementById('productoManual').value;
+    const cantidad = parseInt(document.getElementById('cantidadItem').value) || 1;
+    const precio = parseFloat(document.getElementById('precioItem').value) || 0;
+
+    if (!producto) {
+      alert('Por favor, seleccione o escriba un producto');
+      return;
+    }
+
+    if (cantidad <= 0) {
+      alert('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    if (precio <= 0) {
+      alert('El precio debe ser mayor a 0');
+      return;
+    }
+
+    const item = {
+      id: Date.now(),
+      producto: producto,
+      cantidad: cantidad,
+      precio: precio,
+      subtotal: cantidad * precio
+    };
+
+    // Agregar el item al array global
+    if (!Array.isArray(window.itemsCotizacion)) {
+      window.itemsCotizacion = [];
+    }
+    window.itemsCotizacion.push(item);
+    actualizarTablaItemsCotizacion();
+    actualizarTotalCotizacion();
+
+    // Limpiar campos
+    document.getElementById('buscarProducto').value = '';
+    document.getElementById('productoManual').value = '';
+    document.getElementById('cantidadItem').value = '1';
+    document.getElementById('precioItem').value = '';
+    document.getElementById('resultadosBusqueda').style.display = 'none';
+
+    // Volver a mostrar la lista de productos disponibles
+    if (typeof filtrarProductosCotizacion === 'function') {
+      filtrarProductosCotizacion();
+    } else if (typeof buscarProductosCotizacion === 'function') {
+      buscarProductosCotizacion();
+    }
+  } catch (error) {
+    console.error('Error al agregar item:', error);
+    alert('Error al agregar el item a la cotización');
+  }
+}
+
+function mostrarItemsCotizacion() {
+    const tabla = document.getElementById('tablaItemsCotizacion');
+    if (!tabla) return;
+
+    tabla.innerHTML = '';
+    
+    if (!cotizacionActual || !cotizacionActual.items || cotizacionActual.items.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="4" class="text-center">No hay items en la cotización</td></tr>';
+        return;
+    }
+
+    cotizacionActual.items.forEach(item => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${item.nombre}</td>
+            <td>${item.cantidad}</td>
+            <td>${formatearPrecio(item.precio)}</td>
+            <td>${formatearPrecio(item.subtotal)}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="eliminarItemCotizacion(${item.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tabla.appendChild(fila);
+    });
+
+    // Actualizar total
+    const totalElement = document.getElementById('totalCotizacion');
+    if (totalElement) {
+        totalElement.textContent = formatearPrecio(cotizacionActual.total);
+    }
+}
+
+function limpiarFormularioItem() {
+    document.getElementById('cantidadItem').value = '';
+    document.getElementById('precioItem').value = '';
+    document.getElementById('buscarProducto').value = '';
+    document.getElementById('productoManual').value = '';
+    document.getElementById('resultadosBusqueda').innerHTML = '';
+}
+
+function eliminarItemCotizacion(id) {
+    if (!cotizacionActual) return;
+    
+    cotizacionActual.items = cotizacionActual.items.filter(item => item.id !== id);
+    cotizacionActual.total = cotizacionActual.items.reduce((sum, item) => sum + item.subtotal, 0);
+    
+    actualizarTablaItemsCotizacion();
+}
+
+function guardarCotizacion() {
+    try {
+        const clienteId = document.getElementById('clienteCotizacion').value;
+        const fecha = document.getElementById('fechaCotizacion').value;
+
+        if (!clienteId) {
+            alert('Por favor, seleccione un cliente');
+            return;
+        }
+
+        if (!fecha) {
+            alert('Por favor, seleccione una fecha');
+            return;
+        }
+
+        if (window.itemsCotizacion.length === 0) {
+            alert('Por favor, agregue al menos un item a la cotización');
+            return;
+        }
+
+        const cotizacion = {
+            id: Date.now(),
+            fecha: fecha,
+            clienteId: clienteId,
+            items: window.itemsCotizacion,
+            total: window.itemsCotizacion.reduce((sum, item) => sum + item.subtotal, 0)
+        };
+
+        // Guardar en localStorage
+        const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+        cotizaciones.push(cotizacion);
+        localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+
+        // Cerrar modal y limpiar
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalNuevaCotizacion'));
+        modal.hide();
+        window.itemsCotizacion = [];
+        actualizarTablaCotizaciones();
+
+        alert('Cotización guardada exitosamente');
+    } catch (error) {
+        console.error('Error al guardar cotización:', error);
+        alert('Error al guardar la cotización');
+    }
+}
+
+function mostrarCotizaciones() {
+    const tabla = document.getElementById('tablaCotizaciones');
+    if (!tabla) return;
+
+    tabla.innerHTML = '';
+    
+    if (!cotizaciones || cotizaciones.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="5" class="text-center">No hay cotizaciones</td></tr>';
+        return;
+    }
+
+    cotizaciones.forEach(cotizacion => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${new Date(cotizacion.fecha).toLocaleDateString()}</td>
+            <td>${cotizacion.cliente.nombre}</td>
+            <td>${cotizacion.items.length} items</td>
+            <td>${formatearPrecio(cotizacion.total)}</td>
+            <td>
+                <button class="btn btn-info btn-sm" onclick="verCotizacion(${cotizacion.id})">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="eliminarCotizacion(${cotizacion.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tabla.appendChild(fila);
+    });
+}
+
+function verCotizacion(id) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+    const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+    const cotizacion = cotizaciones.find(c => c.id === id);
+    
+    if (!cotizacion) {
+        alert('Cotización no encontrada');
+        return;
+    }
+
+    const cliente = clientes.find(c => c.id === cotizacion.clienteId);
+    
+    // Mostrar detalles en el modal
+    document.getElementById('fechaCotizacionVer').textContent = formatearFecha(cotizacion.fecha);
+    document.getElementById('clienteCotizacionVer').textContent = cliente ? cliente.nombre : 'Cliente no encontrado';
+    
+    const tbody = document.getElementById('tablaItemsCotizacionVer');
+    tbody.innerHTML = '';
+    cotizacion.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.producto}</td>
+            <td>${item.cantidad}</td>
+            <td>${formatearPrecio(item.precio)}</td>
+            <td>${formatearPrecio(item.subtotal)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    document.getElementById('totalCotizacionVer').textContent = formatearPrecio(cotizacion.total);
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalVerCotizacion'));
+    modal.show();
+}
+
+function eliminarCotizacion(id) {
+    if (confirm('¿Está seguro de eliminar esta cotización?')) {
+        const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+        const nuevasCotizaciones = cotizaciones.filter(c => c.id !== id);
+        localStorage.setItem('cotizaciones', JSON.stringify(nuevasCotizaciones));
+        actualizarTablaCotizaciones();
+    }
+}
+
+function limpiarFormularioCotizacion() {
+    cotizacionActual = null;
+    document.getElementById('clienteCotizacion').value = '';
+    document.getElementById('fechaCotizacion').value = new Date().toISOString().split('T')[0];
+    document.getElementById('tablaItemsCotizacion').innerHTML = '';
+    document.getElementById('totalCotizacion').textContent = formatearPrecio(0);
+}
+
+function buscarProductosCotizacion() {
+    const busqueda = document.getElementById('buscarProducto').value.toLowerCase();
+    const categoria = document.getElementById('categoriaProducto').value;
+    
+    let resultados = productos;
+    
+    if (busqueda) {
+        resultados = resultados.filter(p => 
+            p.nombre.toLowerCase().includes(busqueda) ||
+            p.categoria.toLowerCase().includes(busqueda)
+        );
+    }
+    
+    if (categoria) {
+        resultados = resultados.filter(p => p.categoria === categoria);
+    }
+    
+    const resultadosDiv = document.getElementById('resultadosBusqueda');
+    resultadosDiv.innerHTML = '';
+    
+    if (resultados.length === 0) {
+        resultadosDiv.innerHTML = '<p class="text-muted">No se encontraron productos</p>';
+        return;
+    }
+    
+    resultados.forEach(producto => {
+        const div = document.createElement('div');
+        div.className = 'resultado-busqueda';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${producto.nombre}</strong>
+                    <br>
+                    <small class="text-muted">${producto.categoria}</small>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="seleccionarProducto(${producto.id})">
+                    Seleccionar
+                </button>
+            </div>
+        `;
+        resultadosDiv.appendChild(div);
+    });
+}
+
+function seleccionarProducto(id) {
+    const producto = productos.find(p => p.id === id);
+    if (!producto) return;
+
+    document.getElementById('buscarProducto').value = producto.nombre;
+    document.getElementById('precioItem').value = producto.precio;
+    document.getElementById('resultadosBusqueda').innerHTML = '';
+}
+
+function actualizarTablaItemsCotizacion() {
+    const tabla = document.getElementById('tablaItemsCotizacion');
+    if (!tabla || !cotizacionActual) return;
+
+    tabla.innerHTML = '';
+    
+    cotizacionActual.items.forEach(item => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${item.nombre}</td>
+            <td>${item.cantidad}</td>
+            <td>${formatearPrecio(item.precio)}</td>
+            <td>${formatearPrecio(item.subtotal)}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="eliminarItemCotizacion(${item.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tabla.appendChild(fila);
+    });
+
+    const totalElement = document.getElementById('totalCotizacion');
+    if (totalElement) {
+        totalElement.textContent = formatearPrecio(cotizacionActual.total);
+    }
+}
+
+function limpiarRecursosModal(modalId) {
+    const modalElement = document.getElementById(modalId);
+    if (!modalElement) return;
+
+    // Remover event listeners
+    const newModalElement = modalElement.cloneNode(true);
+    modalElement.parentNode.replaceChild(newModalElement, modalElement);
+
+    // Limpiar contenido si es necesario
+    if (modalId === 'modalNuevaCotizacion') {
+        limpiarFormularioCotizacion();
+    }
+}
+
+// Funciones para Cotizaciones
+function actualizarTotalCotizacion() {
+  const total = window.itemsCotizacion.reduce((sum, item) => sum + (item.cantidad * item.precio), 0);
+  const totalElement = document.getElementById('totalCotizacion');
+  if (totalElement) {
+    totalElement.textContent = formatearPrecio(total);
+  }
+}
+
+function agregarItemCotizacion() {
+  try {
+    const producto = document.getElementById('productoManual').style.display === 'none' 
+      ? document.getElementById('buscarProducto').value
+      : document.getElementById('productoManual').value;
+    const cantidad = parseInt(document.getElementById('cantidadItem').value) || 1;
+    const precio = parseFloat(document.getElementById('precioItem').value) || 0;
+
+    if (!producto) {
+      alert('Por favor, seleccione o escriba un producto');
+      return;
+    }
+
+    if (cantidad <= 0) {
+      alert('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    if (precio <= 0) {
+      alert('El precio debe ser mayor a 0');
+      return;
+    }
+
+    const item = {
+      id: Date.now(),
+      producto: producto,
+      cantidad: cantidad,
+      precio: precio,
+      subtotal: cantidad * precio
+    };
+
+    // Agregar el item al array global
+    if (!Array.isArray(window.itemsCotizacion)) {
+      window.itemsCotizacion = [];
+    }
+    window.itemsCotizacion.push(item);
+    actualizarTablaItemsCotizacion();
+    actualizarTotalCotizacion();
+
+    // Limpiar campos
+    document.getElementById('buscarProducto').value = '';
+    document.getElementById('productoManual').value = '';
+    document.getElementById('cantidadItem').value = '1';
+    document.getElementById('precioItem').value = '';
+    document.getElementById('resultadosBusqueda').style.display = 'none';
+
+    // Volver a mostrar la lista de productos disponibles
+    if (typeof filtrarProductosCotizacion === 'function') {
+      filtrarProductosCotizacion();
+    } else if (typeof buscarProductosCotizacion === 'function') {
+      buscarProductosCotizacion();
+    }
+  } catch (error) {
+    console.error('Error al agregar item:', error);
+    alert('Error al agregar el item a la cotización');
+  }
+}
+
+function mostrarItemsCotizacion() {
+    const tabla = document.getElementById('tablaItemsCotizacion');
+    if (!tabla) return;
+
+    tabla.innerHTML = '';
+    
+    if (!cotizacionActual || !cotizacionActual.items || cotizacionActual.items.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="4" class="text-center">No hay items en la cotización</td></tr>';
+        return;
+    }
+
+    cotizacionActual.items.forEach(item => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${item.nombre}</td>
+            <td>${item.cantidad}</td>
+            <td>${formatearPrecio(item.precio)}</td>
+            <td>${formatearPrecio(item.subtotal)}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="eliminarItemCotizacion(${item.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tabla.appendChild(fila);
+    });
+
+    // Actualizar total
+    const totalElement = document.getElementById('totalCotizacion');
+    if (totalElement) {
+        totalElement.textContent = formatearPrecio(cotizacionActual.total);
+    }
+}
+
+function limpiarFormularioItem() {
+    document.getElementById('cantidadItem').value = '';
+    document.getElementById('precioItem').value = '';
+    document.getElementById('buscarProducto').value = '';
+    document.getElementById('productoManual').value = '';
+    document.getElementById('resultadosBusqueda').innerHTML = '';
+}
+
+function eliminarItemCotizacion(id) {
+    if (!cotizacionActual) return;
+    
+    cotizacionActual.items = cotizacionActual.items.filter(item => item.id !== id);
+    cotizacionActual.total = cotizacionActual.items.reduce((sum, item) => sum + item.subtotal, 0);
+    
+    actualizarTablaItemsCotizacion();
+}
+
+function guardarCotizacion() {
+    try {
+        const clienteId = document.getElementById('clienteCotizacion').value;
+        const fecha = document.getElementById('fechaCotizacion').value;
+
+        if (!clienteId) {
+            alert('Por favor, seleccione un cliente');
+            return;
+        }
+
+        if (!fecha) {
+            alert('Por favor, seleccione una fecha');
+            return;
+        }
+
+        if (window.itemsCotizacion.length === 0) {
+            alert('Por favor, agregue al menos un item a la cotización');
+            return;
+        }
+
+        const cotizacion = {
+            id: Date.now(),
+            fecha: fecha,
+            clienteId: clienteId,
+            items: window.itemsCotizacion,
+            total: window.itemsCotizacion.reduce((sum, item) => sum + item.subtotal, 0)
+        };
+
+        // Guardar en localStorage
+        const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+        cotizaciones.push(cotizacion);
+        localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+
+        // Cerrar modal y limpiar
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalNuevaCotizacion'));
+        modal.hide();
+        window.itemsCotizacion = [];
+        actualizarTablaCotizaciones();
+
+        alert('Cotización guardada exitosamente');
+    } catch (error) {
+        console.error('Error al guardar cotización:', error);
+        alert('Error al guardar la cotización');
+    }
+}
+
+function mostrarCotizaciones() {
+    const tabla = document.getElementById('tablaCotizaciones');
+    if (!tabla) return;
+
+    tabla.innerHTML = '';
+    
+    if (!cotizaciones || cotizaciones.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="5" class="text-center">No hay cotizaciones</td></tr>';
+        return;
+    }
+
+    cotizaciones.forEach(cotizacion => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${new Date(cotizacion.fecha).toLocaleDateString()}</td>
+            <td>${cotizacion.cliente.nombre}</td>
+            <td>${cotizacion.items.length} items</td>
+            <td>${formatearPrecio(cotizacion.total)}</td>
+            <td>
+                <button class="btn btn-info btn-sm" onclick="verCotizacion(${cotizacion.id})">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="eliminarCotizacion(${cotizacion.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tabla.appendChild(fila);
+    });
+}
+
+function verCotizacion(id) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+    const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+    const cotizacion = cotizaciones.find(c => c.id === id);
+    
+    if (!cotizacion) {
+        alert('Cotización no encontrada');
+        return;
+    }
+
+    const cliente = clientes.find(c => c.id === cotizacion.clienteId);
+    
+    // Mostrar detalles en el modal
+    document.getElementById('fechaCotizacionVer').textContent = formatearFecha(cotizacion.fecha);
+    document.getElementById('clienteCotizacionVer').textContent = cliente ? cliente.nombre : 'Cliente no encontrado';
+    
+    const tbody = document.getElementById('tablaItemsCotizacionVer');
+    tbody.innerHTML = '';
+    cotizacion.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.producto}</td>
+            <td>${item.cantidad}</td>
+            <td>${formatearPrecio(item.precio)}</td>
+            <td>${formatearPrecio(item.subtotal)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    document.getElementById('totalCotizacionVer').textContent = formatearPrecio(cotizacion.total);
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalVerCotizacion'));
+    modal.show();
+}
+
+function eliminarCotizacion(id) {
+    if (confirm('¿Está seguro de eliminar esta cotización?')) {
+        const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+        const nuevasCotizaciones = cotizaciones.filter(c => c.id !== id);
+        localStorage.setItem('cotizaciones', JSON.stringify(nuevasCotizaciones));
+        actualizarTablaCotizaciones();
+    }
+}
+
+function limpiarFormularioCotizacion() {
+    cotizacionActual = null;
+    document.getElementById('clienteCotizacion').value = '';
+    document.getElementById('fechaCotizacion').value = new Date().toISOString().split('T')[0];
+    document.getElementById('tablaItemsCotizacion').innerHTML = '';
+    document.getElementById('totalCotizacion').textContent = formatearPrecio(0);
+}
+
+function buscarProductosCotizacion() {
+    const busqueda = document.getElementById('buscarProducto').value.toLowerCase();
+    const categoria = document.getElementById('categoriaProducto').value;
+    
+    let resultados = productos;
+    
+    if (busqueda) {
+        resultados = resultados.filter(p => 
+            p.nombre.toLowerCase().includes(busqueda) ||
+            p.categoria.toLowerCase().includes(busqueda)
+        );
+    }
+    
+    if (categoria) {
+        resultados = resultados.filter(p => p.categoria === categoria);
+    }
+    
+    const resultadosDiv = document.getElementById('resultadosBusqueda');
+    resultadosDiv.innerHTML = '';
+    
+    if (resultados.length === 0) {
+        resultadosDiv.innerHTML = '<p class="text-muted">No se encontraron productos</p>';
+        return;
+    }
+    
+    resultados.forEach(producto => {
+        const div = document.createElement('div');
+        div.className = 'resultado-busqueda';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${producto.nombre}</strong>
+                    <br>
+                    <small class="text-muted">${producto.categoria}</small>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="seleccionarProducto(${producto.id})">
+                    Seleccionar
+                </button>
+            </div>
+        `;
+        resultadosDiv.appendChild(div);
+    });
+}
+
+function seleccionarProducto(id) {
+    const producto = productos.find(p => p.id === id);
+    if (!producto) return;
+
+    document.getElementById('buscarProducto').value = producto.nombre;
+    document.getElementById('precioItem').value = producto.precio;
+    document.getElementById('resultadosBusqueda').innerHTML = '';
+}
+
+function actualizarTablaItemsCotizacion() {
+    const tabla = document.getElementById('tablaItemsCotizacion');
+    if (!tabla || !cotizacionActual) return;
+
+    tabla.innerHTML = '';
+    
+    cotizacionActual.items.forEach(item => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${item.nombre}</td>
+            <td>${item.cantidad}</td>
+            <td>${formatearPrecio(item.precio)}</td>
+            <td>${formatearPrecio(item.subtotal)}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="eliminarItemCotizacion(${item.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tabla.appendChild(fila);
+    });
+
+    const totalElement = document.getElementById('totalCotizacion');
+    if (totalElement) {
+        totalElement.textContent = formatearPrecio(cotizacionActual.total);
+    }
+}
+
+function limpiarRecursosModal(modalId) {
+    const modalElement = document.getElementById(modalId);
+    if (!modalElement) return;
+
+    // Remover event listeners
+    const newModalElement = modalElement.cloneNode(true);
+    modalElement.parentNode.replaceChild(newModalElement, modalElement);
+
+    // Limpiar contenido si es necesario
+    if (modalId === 'modalNuevaCotizacion') {
+        limpiarFormularioCotizacion();
+    }
+}
+
+// Funciones para Cotizaciones
+function actualizarTotalCotizacion() {
+  const total = window.itemsCotizacion.reduce((sum, item) => sum + (item.cantidad * item.precio), 0);
+  const totalElement = document.getElementById('totalCotizacion');
+  if (totalElement) {
+    totalElement.textContent = formatearPrecio(total);
+  }
+}
+
+function agregarItemCotizacion() {
+  try {
+    const producto = document.getElementById('productoManual').style.display === 'none' 
+      ? document.getElementById('buscarProducto').value
+      : document.getElementById('productoManual').value;
+    const cantidad = parseInt(document.getElementById('cantidadItem').value) || 1;
+    const precio = parseFloat(document.getElementById('precioItem').value) || 0;
+
+    if (!producto) {
+      alert('Por favor, seleccione o escriba un producto');
+      return;
+    }
+
+    if (cantidad <= 0) {
+      alert('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    if (precio <= 0) {
+      alert('El precio debe ser mayor a 0');
+      return;
+    }
+
+    const item = {
+      id: Date.now(),
+      producto: producto,
+      cantidad: cantidad,
+      precio: precio,
+      subtotal: cantidad * precio
+    };
+
+    // Agregar el item al array global
+    if (!Array.isArray(window.itemsCotizacion)) {
+      window.itemsCotizacion = [];
+    }
+    window.itemsCotizacion.push(item);
+    actualizarTablaItemsCotizacion();
+    actualizarTotalCotizacion();
+
+    // Limpiar campos
+    document.getElementById('buscarProducto').value = '';
+    document.getElementById('productoManual').value = '';
+    document.getElementById('cantidadItem').value = '1';
+    document.getElementById('precioItem').value = '';
+    document.getElementById('resultadosBusqueda').style.display = 'none';
+
+    // Volver a mostrar la lista de productos disponibles
+    if (typeof filtrarProductosCotizacion === 'function') {
+      filtrarProductosCotizacion();
+    } else if (typeof buscarProductosCotizacion === 'function') {
+      buscarProductosCotizacion();
+    }
+  } catch (error) {
+    console.error('Error al agregar item:', error);
+    alert('Error al agregar el item a la cotización');
+  }
+}
+
+function actualizarTablaItemsCotizacion() {
+  const tbody = document.getElementById('itemsCotizacion');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  window.itemsCotizacion.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${item.producto}</td>
+      <td>${item.cantidad}</td>
+      <td>${formatearPrecio(item.precio)}</td>
+      <td>${formatearPrecio(item.subtotal)}</td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="eliminarItemCotizacion(${item.id})">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function eliminarItemCotizacion(id) {
+  window.itemsCotizacion = window.itemsCotizacion.filter(item => item.id !== id);
+  actualizarTablaItemsCotizacion();
+  actualizarTotalCotizacion();
+}
+
+function guardarCotizacion() {
+  try {
+    const clienteId = document.getElementById('clienteCotizacion').value;
+    const fecha = document.getElementById('fechaCotizacion').value;
+
+    if (!clienteId) {
+      alert('Por favor, seleccione un cliente');
+      return;
+    }
+
+    if (!fecha) {
+      alert('Por favor, seleccione una fecha');
+      return;
+    }
+
+    if (window.itemsCotizacion.length === 0) {
+      alert('Por favor, agregue al menos un item a la cotización');
+      return;
+    }
+
+    const cotizacion = {
+      id: Date.now(),
+      fecha: fecha,
+      clienteId: clienteId,
+      items: window.itemsCotizacion,
+      total: window.itemsCotizacion.reduce((sum, item) => sum + item.subtotal, 0)
+    };
+
+    // Guardar en localStorage
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+    cotizaciones.push(cotizacion);
+    localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+
+    // Cerrar modal y limpiar
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalNuevaCotizacion'));
+    modal.hide();
+    window.itemsCotizacion = [];
+    actualizarTablaCotizaciones();
+
+    alert('Cotización guardada exitosamente');
+  } catch (error) {
+    console.error('Error al guardar cotización:', error);
+    alert('Error al guardar la cotización');
+  }
+}
+
+function actualizarTablaCotizaciones() {
+  const tbody = document.getElementById('tablaCotizaciones');
+  if (!tbody) return;
+
+  const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+  const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+
+  tbody.innerHTML = '';
+  cotizaciones.forEach(cotizacion => {
+    const cliente = clientes.find(c => c.id === cotizacion.clienteId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="radio" name="cotizacionSeleccionada" value="${cotizacion.id}"></td>
+      <td>${formatearFecha(cotizacion.fecha)}</td>
+      <td>${cliente ? cliente.nombre : 'Cliente no encontrado'}</td>
+      <td>${formatearPrecio(cotizacion.total)}</td>
+      <td>
+        <button class="btn btn-primary btn-sm" onclick="editarCotizacion(${cotizacion.id})">
+          <i class="fas fa-pen"></i>
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarCotizacion(${cotizacion.id})">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function verCotizacion(id) {
+  const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+  const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+  const cotizacion = cotizaciones.find(c => c.id === id);
+  
+  if (!cotizacion) {
+    alert('Cotización no encontrada');
+    return;
+  }
+
+  const cliente = clientes.find(c => c.id === cotizacion.clienteId);
+  
+  // Mostrar detalles en el modal
+  document.getElementById('fechaCotizacionVer').textContent = formatearFecha(cotizacion.fecha);
+  document.getElementById('clienteCotizacionVer').textContent = cliente ? cliente.nombre : 'Cliente no encontrado';
+  
+  const tbody = document.getElementById('tablaItemsCotizacionVer');
+  tbody.innerHTML = '';
+  cotizacion.items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${item.producto}</td>
+      <td>${item.cantidad}</td>
+      <td>${formatearPrecio(item.precio)}</td>
+      <td>${formatearPrecio(item.subtotal)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  
+  document.getElementById('totalCotizacionVer').textContent = formatearPrecio(cotizacion.total);
+  
+  const modal = new bootstrap.Modal(document.getElementById('modalVerCotizacion'));
+  modal.show();
+}
+
+function eliminarCotizacion(id) {
+  if (confirm('¿Está seguro de eliminar esta cotización?')) {
+    const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+    const nuevasCotizaciones = cotizaciones.filter(c => c.id !== id);
+    localStorage.setItem('cotizaciones', JSON.stringify(nuevasCotizaciones));
+    actualizarTablaCotizaciones();
+  }
+}
+
+function buscarCotizaciones() {
+  const busqueda = document.getElementById('buscarCotizacion').value.toLowerCase();
+  const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+  const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+  
+  const cotizacionesFiltradas = cotizaciones.filter(cotizacion => {
+    const cliente = clientes.find(c => c.id === cotizacion.clienteId);
+    return (
+      (cliente && cliente.nombre.toLowerCase().includes(busqueda)) ||
+      cotizacion.fecha.includes(busqueda)
+    );
+  });
+
+  const tbody = document.getElementById('tablaCotizaciones');
+  tbody.innerHTML = '';
+  
+  cotizacionesFiltradas.forEach(cotizacion => {
+    const cliente = clientes.find(c => c.id === cotizacion.clienteId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${formatearFecha(cotizacion.fecha)}</td>
+      <td>${cliente ? cliente.nombre : 'Cliente no encontrado'}</td>
+      <td>${formatearPrecio(cotizacion.total)}</td>
+      <td>
+        <button class="btn btn-info btn-sm" onclick="verCotizacion(${cotizacion.id})">
+          <i class="fas fa-eye"></i>
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="editarCotizacion(${cotizacion.id})">
+          <i class="fas fa-pen"></i>
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarCotizacion(${cotizacion.id})">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Funciones para manejar productos en cotizaciones
+function filtrarProductosCotizacion() {
+  // Ya no se filtra por categoría
+  const busqueda = document.getElementById('buscarProducto').value.toLowerCase();
+  
+  // Obtener todos los productos
+  const productos = JSON.parse(localStorage.getItem('productos')) || [];
+  
+  // Filtrar solo por búsqueda
+  window.productosFiltrados = productos.filter(producto => {
+    return !busqueda || producto.nombre.toLowerCase().includes(busqueda);
+  });
+
+  mostrarResultadosBusqueda();
+}
+
+function mostrarResultadosBusqueda() {
+  const resultadosDiv = document.getElementById('resultadosBusqueda');
+  if (!resultadosDiv) return;
+
+  resultadosDiv.innerHTML = '';
+  
+  if (window.productosFiltrados.length === 0) {
+    resultadosDiv.style.display = 'none';
+    return;
+  }
+
+  window.productosFiltrados.forEach(producto => {
+    const div = document.createElement('div');
+    div.className = 'list-group-item list-group-item-action bg-dark text-white border-light';
+    div.style.cursor = 'pointer';
+    div.textContent = producto.nombre;
+    div.onclick = () => seleccionarProducto(producto);
+    resultadosDiv.appendChild(div);
+  });
+
+  resultadosDiv.style.display = 'block';
+}
+
+function seleccionarProducto(producto) {
+  document.getElementById('buscarProducto').value = producto.nombre;
+  document.getElementById('precioItem').value = producto.precio;
+  document.getElementById('resultadosBusqueda').style.display = 'none';
+}
+
+function toggleProductoManual() {
+  const productoManual = document.getElementById('productoManual');
+  const buscarProducto = document.getElementById('buscarProducto');
+  const resultadosBusqueda = document.getElementById('resultadosBusqueda');
+
+  if (productoManual.style.display === 'none') {
+    productoManual.style.display = 'block';
+    buscarProducto.style.display = 'none';
+    resultadosBusqueda.style.display = 'none';
+    productoManual.focus();
+  } else {
+    productoManual.style.display = 'none';
+    buscarProducto.style.display = 'block';
+    productoManual.value = '';
+  }
+}
+
+function formatearFecha(fechaStr) {
+  // Si ya es un objeto Date, úsalo directamente
+  let fecha = typeof fechaStr === 'string' ? new Date(fechaStr) : fechaStr;
+  if (isNaN(fecha.getTime())) return fechaStr; // Si no es válida, retorna el string original
+  // Formato: dd/mm/yyyy
+  let dia = String(fecha.getDate()).padStart(2, '0');
+  let mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  let anio = fecha.getFullYear();
+  return `${dia}/${mes}/${anio}`;
+}
+
+function imprimirCotizacion() {
+  // Obtén los datos mostrados en el modal de ver cotización
+  const fecha = document.getElementById('fechaCotizacionVer').textContent;
+  const cliente = document.getElementById('clienteCotizacionVer').textContent;
+  const items = Array.from(document.querySelectorAll('#tablaItemsCotizacionVer tr')).map(tr => {
+    const tds = tr.querySelectorAll('td');
+    return {
+      producto: tds[0]?.textContent || '',
+      cantidad: tds[1]?.textContent || '',
+      precio: tds[2]?.textContent || '',
+      subtotal: tds[3]?.textContent || ''
+    };
+  });
+  const total = document.getElementById('totalCotizacionVer').textContent;
+
+  // Logo (ajusta la ruta si es necesario)
+  const logo = './image/logo-ToySoft.png';
+
+  // Crea el HTML para imprimir
+  let html = `
+    <div style="font-family: Arial; width: 300px;">
+      <div style="text-align:center; margin-bottom:10px;">
+        <img src="${logo}" alt="Logo" style="max-width:90px; max-height:90px; margin-bottom:5px;">
+        <h2 style="margin:0; font-size:1.2em;">Cotización</h2>
+      </div>
+      <div><strong>Fecha:</strong> ${fecha}</div>
+      <div><strong>Cliente:</strong> ${cliente}</div>
+      <hr>
+      <table style="width:100%; font-size:13px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Producto</th>
+            <th>Cant</th>
+            <th>Precio</th>
+            <th>Subt.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(item => `
+            <tr>
+              <td>${item.producto}</td>
+              <td style="text-align:center;">${item.cantidad}</td>
+              <td style="text-align:right;">${item.precio}</td>
+              <td style="text-align:right;">${item.subtotal}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <hr>
+      <div style="text-align:right; font-size:16px;"><strong>Total: ${total}</strong></div>
+    </div>
+  `;
+
+  // Abre una ventana nueva y manda a imprimir
+  const win = window.open('', 'Imprimir Cotización', 'width=350,height=600');
+  win.document.write(`<html><head><title>Imprimir Cotización</title></head><body onload="window.print();window.close();">${html}</body></html>`);
+  win.document.close();
+}
+
+function obtenerVentanaImpresionCotizacion() {
+  const ventana = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+  if (!ventana) return null;
+  ventana.document.open();
+  ventana.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Cotización</title>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: monospace; font-size: 14px; width: 57mm; margin: 0; padding: 1mm; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .mb-1 { margin-bottom: 0.5mm; }
+          .mt-1 { margin-top: 0.5mm; }
+          table { width: 100%; border-collapse: collapse; margin: 1mm 0; font-size: 14px; }
+          th, td { padding: 0.5mm; text-align: left; font-size: 14px; }
+          .border-top { border-top: 1px dashed #000; margin-top: 1mm; padding-top: 1mm; }
+          .header { border-bottom: 1px dashed #000; padding-bottom: 1mm; margin-bottom: 1mm; }
+          .total-row { font-weight: bold; font-size: 16px; }
+          .botones-impresion { position: fixed; top: 10px; right: 10px; z-index: 1000; background: #fff; padding: 5px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+          .botones-impresion button { margin: 0 5px; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+          .botones-impresion button:hover { background: #0056b3; }
+          .logo-container { text-align: center; margin-bottom: 2mm; }
+          .logo-container img { max-width: 100%; max-height: 120px; }
+          @media print { .botones-impresion { display: none; } @page { margin: 0; size: 57mm auto; } body { width: 57mm; } }
+        </style>
+      </head>
+      <body>
+        <div class="botones-impresion">
+          <button onclick="window.print()">Imprimir</button>
+          <button onclick="window.close()">Cerrar</button>
+        </div>
+        <div id="contenidoCotizacion"></div>
+      </body>
+    </html>
+  `);
+  return ventana;
+}
+
+function imprimirCotizacionSeleccionada() {
+  const seleccionada = document.querySelector('input[name="cotizacionSeleccionada"]:checked');
+  if (!seleccionada) {
+    alert('Por favor, seleccione una cotización para imprimir.');
+    return;
+  }
+  const id = seleccionada.value;
+  const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+  const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+  const cotizacion = cotizaciones.find(c => c.id == id);
+  if (!cotizacion) {
+    alert('Cotización no encontrada.');
+    return;
+  }
+  const cliente = clientes.find(c => c.id === cotizacion.clienteId);
+
+  // Armamos el HTML directamente desde los datos
+  const fecha = formatearFecha(cotizacion.fecha);
+  const nombreCliente = cliente ? cliente.nombre : 'Cliente no encontrado';
+  const items = cotizacion.items;
+  const total = formatearPrecio(cotizacion.total);
+
+  const logo = localStorage.getItem('logoNegocio');
+  let html = '';
+  if (logo) {
+    html += `<div class="logo-container"><img src="${logo}" alt="Logo"></div>`;
+  }
+  html += `
+    <div class="header text-center">
+      <h2 style="margin: 0; font-size: 14px;">COTIZACIÓN</h2>
+      <div class="mb-1">${fecha}</div>
+    </div>
+    <div class="border-top">
+      <div class="mb-1">Cliente: <span>${nombreCliente}</span></div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 40%">Producto</th>
+          <th style="width: 15%">Cant</th>
+          <th style="width: 20%">Precio</th>
+          <th style="width: 25%">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(item => `
+          <tr>
+            <td>${item.producto}</td>
+            <td>${item.cantidad}</td>
+            <td class="text-right">${formatearPrecio(item.precio)}</td>
+            <td class="text-right">${formatearPrecio(item.subtotal)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div class="border-top">
+      <div class="mb-1 total-row"><strong>Total: ${total}</strong></div>
+    </div>
+    <div class="text-center mt-1">
+      <div class="border-top">¡Gracias por su preferencia!</div>
+      <div class="border-top">ToySoft POS</div>
+    </div>
+  `;
+
+  const ventana = obtenerVentanaImpresionCotizacion();
+  if (!ventana) {
+    alert('No se pudo abrir la ventana de impresión. Por favor, verifique que los bloqueadores de ventanas emergentes estén desactivados.');
+    return;
+  }
+  setTimeout(() => {
+    const contenidoDiv = ventana.document.getElementById('contenidoCotizacion');
+    if (contenidoDiv) {
+      contenidoDiv.innerHTML = html;
+      ventana.focus();
+    }
+  }, 100);
+}
+
+function editarCotizacion(id) {
+  const cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+  const clientes = JSON.parse(localStorage.getItem('clientes')) || [];
+  const cotizacion = cotizaciones.find(c => c.id == id);
+  if (!cotizacion) {
+    alert('Cotización no encontrada.');
+    return;
+  }
+  cotizacionEditandoId = id;
+
+  // Abrir el modal de nueva cotización
+  mostrarModalNuevaCotizacion();
+
+  // Cargar datos en el formulario
+  setTimeout(() => {
+    document.getElementById('clienteCotizacion').value = cotizacion.clienteId;
+    document.getElementById('fechaCotizacion').value = cotizacion.fecha;
+    window.itemsCotizacion = cotizacion.items.map(item => ({ ...item }));
+    actualizarTablaItemsCotizacion();
+    actualizarTotalCotizacion();
+  }, 300);
+}
+
+// Modificar guardarCotizacion para actualizar si se está editando
+const guardarCotizacionOriginal = guardarCotizacion;
+guardarCotizacion = function() {
+  try {
+    const clienteId = document.getElementById('clienteCotizacion').value;
+    const fecha = document.getElementById('fechaCotizacion').value;
+
+    if (!clienteId) {
+      alert('Por favor, seleccione un cliente');
+      return;
+    }
+
+    if (!fecha) {
+      alert('Por favor, seleccione una fecha');
+      return;
+    }
+
+    if (window.itemsCotizacion.length === 0) {
+      alert('Por favor, agregue al menos un item a la cotización');
+      return;
+    }
+
+    let cotizaciones = JSON.parse(localStorage.getItem('cotizaciones')) || [];
+    if (cotizacionEditandoId) {
+      // Editar cotización existente
+      cotizaciones = cotizaciones.map(c =>
+        c.id == cotizacionEditandoId
+          ? {
+              ...c,
+              fecha: fecha,
+              clienteId: clienteId,
+              items: window.itemsCotizacion,
+              total: window.itemsCotizacion.reduce((sum, item) => sum + item.subtotal, 0)
+            }
+          : c
+      );
+    } else {
+      // Nueva cotización
+      const cotizacion = {
+        id: Date.now(),
+        fecha: fecha,
+        clienteId: clienteId,
+        items: window.itemsCotizacion,
+        total: window.itemsCotizacion.reduce((sum, item) => sum + item.subtotal, 0)
+      };
+      cotizaciones.push(cotizacion);
+    }
+    localStorage.setItem('cotizaciones', JSON.stringify(cotizaciones));
+
+    // Cerrar modal y limpiar
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalNuevaCotizacion'));
+    modal.hide();
+    window.itemsCotizacion = [];
+    cotizacionEditandoId = null;
+    actualizarTablaCotizaciones();
+
+    alert('Cotización guardada exitosamente');
+  } catch (error) {
+    console.error('Error al guardar cotización:', error);
+    alert('Error al guardar la cotización');
+  }
 }
   

@@ -643,35 +643,17 @@ function guardarModificacionProducto() {
 // Funciones para Cierre Diario
 function mostrarModalCierreDiario() {
     try {
-        console.log('Iniciando mostrarModalCierreDiario...');
-        if (typeof bootstrap === 'undefined') {
-            console.error('Bootstrap no está disponible');
-            alert('Error: Bootstrap no está disponible');
-            return;
-        }
-        const modalElement = document.getElementById('modalCierreDiario');
-        console.log('Elemento del modal:', modalElement);
-        if (!modalElement) {
-            console.error('No se encontró el elemento modal');
-            alert('Error: No se encontró el modal de cierre diario');
-            return;
-        }
-        if (!document.body.contains(modalElement)) {
-            console.error('El modal no está en el DOM');
-            alert('Error: El modal no está en el DOM');
-            return;
-        }
-        const modal = new bootstrap.Modal(modalElement);
         // Obtener ventas del día
         const ventas = JSON.parse(localStorage.getItem('ventas')) || [];
         const hoy = new Date();
-        const hoyStr = hoy.toISOString().slice(0, 10); // YYYY-MM-DD
+        const hoyStr = hoy.toISOString().slice(0, 10);
         const ventasHoy = ventas.filter(v => {
             const fechaVenta = new Date(v.fecha);
             const fechaVentaStr = fechaVenta.toISOString().slice(0, 10);
             return fechaVentaStr === hoyStr;
         });
-        // Calcular totales por método de pago
+
+        // Calcular totales
         let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
         ventasHoy.forEach(v => {
             const total = parseFloat(v.total) || 0;
@@ -700,6 +682,7 @@ function mostrarModalCierreDiario() {
             }
             totalVentas += total;
         });
+
         // Obtener gastos del día
         const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
         const gastosHoy = gastos.filter(g => {
@@ -708,48 +691,244 @@ function mostrarModalCierreDiario() {
             return fechaGastoStr === hoyStr;
         });
         const totalGastos = gastosHoy.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
+
+        // Calcular balance final
         const balanceFinal = totalVentas - totalGastos;
-        // Actualizar valores en el modal
-        document.getElementById('totalVentasHoy').textContent = `$ ${totalVentas.toLocaleString()}`;
-        document.getElementById('totalEfectivoHoy').textContent = `$ ${totalEfectivo.toLocaleString()}`;
-        document.getElementById('totalTransferenciaHoy').textContent = `$ ${totalTransferencia.toLocaleString()}`;
-        if(document.getElementById('totalTarjetaHoy')) document.getElementById('totalTarjetaHoy').textContent = `$ ${totalTarjeta.toLocaleString()}`;
-        if(document.getElementById('totalCreditoHoy')) document.getElementById('totalCreditoHoy').textContent = `$ ${totalCredito.toLocaleString()}`;
-        if(document.getElementById('totalMixtoHoy')) document.getElementById('totalMixtoHoy').textContent = `$ ${totalMixto.toLocaleString()}`;
-        document.getElementById('totalGastos').textContent = `$ ${totalGastos.toLocaleString()}`;
-        document.getElementById('balanceFinal').textContent = `$ ${balanceFinal.toLocaleString()}`;
-        document.getElementById('detallesCierre').value = '';
+
+        // Crear el contenido del modal
+        const modalContent = `
+            <div class="modal fade" id="modalCierreDiario" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content bg-dark text-white">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Cierre Diario</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Nombre de quien cierra</label>
+                                    <input type="text" class="form-control bg-dark text-white" id="nombreCierre" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Nombre de quien recibe</label>
+                                    <input type="text" class="form-control bg-dark text-white" id="nombreRecibe" required>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Monto base de caja</label>
+                                    <input type="number" class="form-control bg-dark text-white" id="montoBaseCaja" required>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <label class="form-label">Detalles adicionales</label>
+                                    <textarea class="form-control bg-dark text-white" id="detallesCierre" rows="3"></textarea>
+                                </div>
+                            </div>
+                            <div class="border-top border-secondary pt-3">
+                                <h6>Resumen de Ventas</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p>Total Ventas: $ ${totalVentas.toLocaleString()}</p>
+                                        <p>Efectivo: $ ${totalEfectivo.toLocaleString()}</p>
+                                        <p>Transferencia: $ ${totalTransferencia.toLocaleString()}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p>Tarjeta: $ ${totalTarjeta.toLocaleString()}</p>
+                                        <p>Crédito: $ ${totalCredito.toLocaleString()}</p>
+                                        <p>Mixto: $ ${totalMixto.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="border-top border-secondary pt-3">
+                                <h6>Gastos del Día</h6>
+                                <p>Total Gastos: $ ${totalGastos.toLocaleString()}</p>
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Descripción</th>
+                                                <th>Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${gastosHoy.map(gasto => `
+                                                <tr>
+                                                    <td>${gasto.descripcion}</td>
+                                                    <td>$ ${gasto.monto.toLocaleString()}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="border-top border-secondary pt-3">
+                                <h6>Balance Final</h6>
+                                <p class="fs-4">$ ${balanceFinal.toLocaleString()}</p>
+                            </div>
+                            <div class="border-top border-secondary pt-3">
+                                <h6>Créditos Pendientes</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Cliente</th>
+                                                <th>Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${ventasHoy.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito').map(v => `
+                                                <tr>
+                                                    <td>${v.cliente || 'No especificado'}</td>
+                                                    <td>$ ${v.total.toLocaleString()}</td>
+                                                </tr>
+                                            `).join('') || '<tr><td colspan="2">No hay créditos pendientes</td></tr>'}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-success" onclick="exportarCierresDiariosExcel()">
+                                <i class="fas fa-file-excel"></i> Exportar a Excel
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="guardarCierreDiario()">Guardar e imprimir cierre</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Eliminar modal existente si hay uno
+        const modalExistente = document.getElementById('modalCierreDiario');
+        if (modalExistente) {
+            modalExistente.remove();
+        }
+
+        // Agregar nuevo modal al body
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+
+        // Mostrar el modal
+        const modal = new bootstrap.Modal(document.getElementById('modalCierreDiario'));
         modal.show();
-        console.log('Modal mostrado correctamente');
     } catch (error) {
-        console.error('Error al mostrar el modal:', error);
-        alert('Error al mostrar el modal de cierre diario: ' + error.message);
+        console.error('Error al mostrar modal de cierre:', error);
+        alert('Error al mostrar el modal de cierre');
     }
 }
 
 function guardarCierreDiario() {
-    const detalles = document.getElementById('detallesCierre').value;
-    const fecha = new Date().toLocaleDateString();
-    
-    // Obtener datos actuales
-    const cierres = JSON.parse(localStorage.getItem('cierresDiarios')) || [];
-    
-    // Crear nuevo cierre
-    const nuevoCierre = {
-        fecha,
-        totalVentas: parseFloat(document.getElementById('totalVentasHoy').textContent.replace('$', '').replace(',', '')),
-        totalEfectivo: parseFloat(document.getElementById('totalEfectivoHoy').textContent.replace('$', '').replace(',', '')),
-        totalTransferencia: parseFloat(document.getElementById('totalTransferenciaHoy').textContent.replace('$', '').replace(',', '')),
-        totalGastos: parseFloat(document.getElementById('totalGastos').textContent.replace('$', '').replace(',', '')),
-        balanceFinal: parseFloat(document.getElementById('balanceFinal').textContent.replace('$', '').replace(',', '')),
-        detalles
-    };
-    
-    // Agregar nuevo cierre
-    cierres.push(nuevoCierre);
-    
-    // Guardar en localStorage
-    localStorage.setItem('cierresDiarios', JSON.stringify(cierres));
+    try {
+        // Validar campos requeridos
+        const nombreCierre = document.getElementById('nombreCierre').value.trim();
+        const nombreRecibe = document.getElementById('nombreRecibe').value.trim();
+        const montoBaseCaja = parseFloat(document.getElementById('montoBaseCaja').value) || 0;
+
+        if (!nombreCierre || !nombreRecibe || montoBaseCaja <= 0) {
+            alert('Por favor complete todos los campos requeridos');
+            return;
+        }
+
+        // Mostrar confirmación
+        const confirmacion = confirm(
+            '¿Está seguro de realizar el cierre?\n\n' +
+            'Se realizarán las siguientes acciones:\n' +
+            '- Se reiniciarán todas las ventas\n' +
+            '- Se reiniciarán todos los gastos\n' +
+            '- Se reiniciarán los contadores de delivery y recoger\n' +
+            '- Se limpiarán todas las mesas activas\n\n' +
+            'Esta acción no se puede deshacer.'
+        );
+
+        if (!confirmacion) {
+            return;
+        }
+
+        // Obtener ventas del día
+        const ventas = JSON.parse(localStorage.getItem('ventas')) || [];
+        const hoy = new Date();
+        const hoyStr = hoy.toISOString().slice(0, 10);
+        const ventasHoy = ventas.filter(v => {
+            const fechaVenta = new Date(v.fecha);
+            const fechaVentaStr = fechaVenta.toISOString().slice(0, 10);
+            return fechaVentaStr === hoyStr;
+        });
+
+        // Calcular totales
+        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
+        ventasHoy.forEach(v => {
+            const total = parseFloat(v.total) || 0;
+            const metodo = (v.metodoPago || '').toLowerCase();
+            if (metodo === 'mixto') {
+                const efectivoMixto = parseFloat(v.montoRecibido) || 0;
+                const transferenciaMixto = parseFloat(v.montoTransferencia) || 0;
+                totalMixto += total;
+                totalEfectivo += efectivoMixto;
+                totalTransferencia += transferenciaMixto;
+            } else {
+                switch (metodo) {
+                    case 'efectivo':
+                        totalEfectivo += total;
+                        break;
+                    case 'transferencia':
+                        totalTransferencia += total;
+                        break;
+                    case 'tarjeta':
+                        totalTarjeta += total;
+                        break;
+                    case 'crédito':
+                        totalCredito += total;
+                        break;
+                }
+            }
+            totalVentas += total;
+        });
+
+        // Obtener gastos del día
+        const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
+        const gastosHoy = gastos.filter(g => {
+            const fechaGasto = new Date(g.fecha);
+            const fechaGastoStr = fechaGasto.toISOString().slice(0, 10);
+            return fechaGastoStr === hoyStr;
+        });
+        const totalGastos = gastosHoy.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
+
+        // Calcular balance final
+        const balanceFinal = totalVentas - totalGastos;
+
+        // Crear objeto de cierre
+        const cierre = {
+            fecha: hoy.toISOString(),
+            ventas: {
+                total: totalVentas,
+                efectivo: totalEfectivo,
+                transferencia: totalTransferencia,
+                tarjeta: totalTarjeta,
+                credito: totalCredito,
+                mixto: totalMixto
+            },
+            gastos: totalGastos,
+            balance: balanceFinal,
+            nombreCierre: nombreCierre,
+            nombreRecibe: nombreRecibe,
+            montoBaseCaja: montoBaseCaja,
+            detalles: document.getElementById('detallesCierre').value.trim()
+        };
+
+        // Guardar cierre en localStorage
+        const cierres = JSON.parse(localStorage.getItem('cierres')) || [];
+        cierres.push(cierre);
+        localStorage.setItem('cierres', JSON.stringify(cierres));
+
+        // Reiniciar sistema
+        localStorage.setItem('ventas', JSON.stringify([]));
+        localStorage.setItem('gastos', JSON.stringify([]));
+        localStorage.setItem('contadorDelivery', '1');
+        localStorage.setItem('contadorRecoger', '1');
+        localStorage.setItem('mesasActivas', JSON.stringify([]));
     
     // Cerrar modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('modalCierreDiario'));
@@ -757,13 +936,21 @@ function guardarCierreDiario() {
     
     // Mostrar mensaje de éxito
     alert('Cierre diario guardado exitosamente');
+
+        // Imprimir tirilla
+        imprimirBalanceDiario();
+
+    } catch (error) {
+        console.error('Error al guardar cierre:', error);
+        alert('Error al guardar el cierre');
+    }
 }
 
 // Función para exportar cierres diarios a Excel
 function exportarCierresDiariosExcel() {
     try {
         // Obtener todos los cierres
-        const cierres = JSON.parse(localStorage.getItem('cierresDiarios')) || [];
+        const cierres = JSON.parse(localStorage.getItem('cierres')) || [];
         
         if (cierres.length === 0) {
             alert('No hay cierres diarios para exportar');
@@ -784,11 +971,11 @@ function exportarCierresDiariosExcel() {
         cierres.forEach(cierre => {
             datos.push([
                 cierre.fecha,
-                `$ ${cierre.totalVentas.toLocaleString()}`,
-                `$ ${cierre.totalEfectivo.toLocaleString()}`,
-                `$ ${cierre.totalTransferencia.toLocaleString()}`,
-                `$ ${cierre.totalGastos.toLocaleString()}`,
-                `$ ${cierre.balanceFinal.toLocaleString()}`,
+                `$ ${cierre.ventas.total.toLocaleString()}`,
+                `$ ${cierre.ventas.efectivo.toLocaleString()}`,
+                `$ ${cierre.ventas.transferencia.toLocaleString()}`,
+                `$ ${cierre.gastos.toLocaleString()}`,
+                `$ ${cierre.balance.toLocaleString()}`,
                 cierre.detalles || ''
             ]);
         });
@@ -1082,14 +1269,17 @@ function imprimirBalancePorPeriodo(periodo) {
             const fechaGasto = new Date(g.fecha);
             return fechaGasto >= fechaInicio && fechaGasto <= fechaFin;
         });
-        // Calcular totales por método de pago (sin mostrar mixto)
-        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalVentas = 0;
+        // Calcular totales por método de pago
+        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
         ventasPeriodo.forEach(v => {
             const total = parseFloat(v.total) || 0;
             const metodo = (v.metodoPago || '').toLowerCase();
             if (metodo === 'mixto') {
-                totalEfectivo += parseFloat(v.montoRecibido) || 0;
-                totalTransferencia += parseFloat(v.montoTransferencia) || 0;
+                const efectivoMixto = parseFloat(v.montoRecibido) || 0;
+                const transferenciaMixto = parseFloat(v.montoTransferencia) || 0;
+                totalMixto += total;
+                totalEfectivo += efectivoMixto;
+                totalTransferencia += transferenciaMixto;
             } else {
                 switch (metodo) {
                     case 'efectivo':
@@ -1110,6 +1300,7 @@ function imprimirBalancePorPeriodo(periodo) {
         });
         const totalGastos = gastosPeriodo.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
         const balanceFinal = totalVentas - totalGastos;
+
         // Crear el modal de vista previa
         const modalHtml = `
             <div class="modal fade" id="modalVistaPreviaBalance" tabindex="-1">
@@ -1140,7 +1331,7 @@ ${new Date().toLocaleString()}
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                            <button type="button" class="btn btn-primary" onclick="imprimirBalance('${periodo}')">Imprimir</button>
+                            <button type="button" class="btn btn-primary" onclick="imprimirBalancePorPeriodoImpresion('${periodo}')">Imprimir</button>
                         </div>
                     </div>
                 </div>
@@ -1159,16 +1350,14 @@ ${new Date().toLocaleString()}
     }
 }
 
-// Función para imprimir el balance
-function imprimirBalance(periodo) {
+// Nueva función: solo imprime cuando el usuario lo solicita
+function imprimirBalancePorPeriodoImpresion(periodo) {
     try {
-        // Obtener todas las ventas desde la clave correcta
+        // (El mismo código de impresión que antes, usando obtenerVentanaImpresion)
         const ventas = JSON.parse(localStorage.getItem('ventas')) || [];
         const gastos = JSON.parse(localStorage.getItem('gastos')) || [];
-        // Obtener la fecha actual
         const hoy = new Date();
         let fechaInicio, fechaFin;
-        // Calcular el rango de fechas según el período
         switch(periodo) {
             case 'semanal':
                 fechaInicio = new Date(hoy);
@@ -1186,10 +1375,8 @@ function imprimirBalance(periodo) {
             default:
                 throw new Error('Período no válido');
         }
-        // Ajustar las fechas para incluir todo el día
         fechaInicio.setHours(0, 0, 0, 0);
         fechaFin.setHours(23, 59, 59, 999);
-        // Filtrar ventas y gastos por el período
         const ventasPeriodo = ventas.filter(v => {
             const fechaVenta = new Date(v.fecha);
             return fechaVenta >= fechaInicio && fechaVenta <= fechaFin;
@@ -1198,14 +1385,16 @@ function imprimirBalance(periodo) {
             const fechaGasto = new Date(g.fecha);
             return fechaGasto >= fechaInicio && fechaGasto <= fechaFin;
         });
-        // Calcular totales por método de pago (sin mostrar mixto)
-        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalVentas = 0;
+        let totalEfectivo = 0, totalTransferencia = 0, totalTarjeta = 0, totalCredito = 0, totalMixto = 0, totalVentas = 0;
         ventasPeriodo.forEach(v => {
             const total = parseFloat(v.total) || 0;
             const metodo = (v.metodoPago || '').toLowerCase();
             if (metodo === 'mixto') {
-                totalEfectivo += parseFloat(v.montoRecibido) || 0;
-                totalTransferencia += parseFloat(v.montoTransferencia) || 0;
+                const efectivoMixto = parseFloat(v.montoRecibido) || 0;
+                const transferenciaMixto = parseFloat(v.montoTransferencia) || 0;
+                totalMixto += total;
+                totalEfectivo += efectivoMixto;
+                totalTransferencia += transferenciaMixto;
             } else {
                 switch (metodo) {
                     case 'efectivo':
@@ -1226,120 +1415,175 @@ function imprimirBalance(periodo) {
         });
         const totalGastos = gastosPeriodo.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
         const balanceFinal = totalVentas - totalGastos;
-        // Detalle de gastos
-        let detalleGastos = '';
-        if (gastosPeriodo.length > 0) {
-            gastosPeriodo.forEach(g => {
-                detalleGastos += `- ${g.descripcion || 'Sin descripción'}: $ ${g.monto}\n`;
-            });
-        } else {
-            detalleGastos = 'No hay gastos registrados\n';
-        }
-        // Créditos pendientes (si aplica)
-        let detalleCreditos = '';
-        const creditos = ventasPeriodo.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito');
-        if (creditos.length > 0) {
-            creditos.forEach(c => {
-                detalleCreditos += `- ${c.cliente || 'Cliente'}: $ ${c.total}\n`;
-            });
-        } else {
-            detalleCreditos = 'No hay créditos pendientes\n';
-        }
-        // Formato de fechas para el encabezado
-        const fechaInicioStr = fechaInicio.toLocaleDateString();
-        const fechaFinStr = fechaFin.toLocaleDateString();
-        // Crear el contenido del recibo (formato POS)
-        const recibo = `
-<span style=\"font-weight: bold;\">BALANCE ${periodo.toUpperCase()}</span>\n${fechaInicioStr} - ${fechaFinStr}\n-----------------------------\nTotal Ventas: $ ${totalVentas.toLocaleString()}\n- Efectivo: $ ${totalEfectivo.toLocaleString()}\n- Transferencia: $ ${totalTransferencia.toLocaleString()}\n- Tarjeta: $ ${totalTarjeta.toLocaleString()}\n- Crédito: $ ${totalCredito.toLocaleString()}\n-----------------------------\nTotal Gastos: $ ${totalGastos.toLocaleString()}\n-----------------------------\n<span style=\"font-weight: bold;\">Balance Final: $ ${balanceFinal.toLocaleString()}</span>\n-----------------------------\nDetalle de Gastos:\n${detalleGastos}-----------------------------\nCréditos Pendientes:\n${detalleCreditos}-----------------------------\n¡Fin del Balance!\nToySoft POS\n`;
-        // Imprimir
-        const ventanaImpresion = window.open('', '_blank');
-        ventanaImpresion.document.write(`
+        const ventana = obtenerVentanaImpresion();
+        const contenido = `
             <html>
                 <head>
                     <title>Balance ${periodo}</title>
                     <style>
-                        @page {
-                            size: 57mm auto;
+                        body { 
+                            font-family: monospace;
+                            font-size: 14px;
+                            width: 57mm;
                             margin: 0;
+                            padding: 1mm;
                         }
-                        html, body {
-                            width: 57mm !important;
-                            min-width: 57mm !important;
-                            max-width: 57mm !important;
-                            height: 100% !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            overflow: hidden !important;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: flex-start;
-                            background: white;
+                        .text-center { text-align: center; }
+                        .text-right { text-align: right; }
+                        .mb-1 { margin-bottom: 0.5mm; }
+                        .mt-1 { margin-top: 0.5mm; }
+                        .border-top { 
+                            border-top: 1px dashed #000;
+                            margin-top: 1mm;
+                            padding-top: 1mm;
                         }
-                        body {
-                            font-family: 'Courier New', monospace;
-                            font-size: 12pt;
-                            white-space: pre-line;
-                            word-wrap: break-word;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            width: 100% !important;
-                            box-sizing: border-box;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: flex-start;
+                        .header {
+                            border-bottom: 1px dashed #000;
+                            padding-bottom: 1mm;
+                            margin-bottom: 1mm;
                         }
-                        .balance-content {
-                            width: 100%;
-                            max-width: 100%;
+                        .total-row {
+                            font-weight: bold;
+                            font-size: 16px;
+                        }
+                        .botones-impresion {
+                            position: fixed;
+                            top: 10px;
+                            right: 10px;
+                            z-index: 1000;
+                            background: #fff;
+                            padding: 5px;
+                            border-radius: 5px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        }
+                        .botones-impresion button {
+                            margin: 0 5px;
+                            padding: 5px 10px;
+                            background: #007bff;
+                            color: white;
+                            border: none;
+                            border-radius: 3px;
+                            cursor: pointer;
+                        }
+                        .botones-impresion button:hover {
+                            background: #0056b3;
+                        }
+                        .logo-container {
                             text-align: center;
-                            margin: 0 auto;
-                            padding: 0;
-                            box-sizing: border-box;
+                            margin-bottom: 2mm;
+                        }
+                        .logo-container img {
+                            max-width: 100%;
+                            max-height: 120px;
                         }
                         @media print {
-                            html, body {
-                                width: 57mm !important;
-                                min-width: 57mm !important;
-                                max-width: 57mm !important;
-                                height: 100% !important;
-                                margin: 0 !important;
-                                padding: 0 !important;
-                                overflow: hidden !important;
-                                display: flex;
-                                flex-direction: column;
-                                align-items: center;
-                                justify-content: flex-start;
+                            .botones-impresion {
+                                display: none;
+                            }
+                            @page {
+                                margin: 0;
+                                size: 57mm auto;
                             }
                             body {
-                                font-size: 12pt;
-                                -webkit-print-color-adjust: exact;
-                                width: 100% !important;
-                                margin: 0 !important;
-                                padding: 0 !important;
-                            }
-                            .balance-content {
-                                width: 100%;
-                                max-width: 100%;
-                                text-align: center;
-                                margin: 0 auto;
-                                padding: 0;
+                                width: 57mm;
                             }
                         }
                     </style>
                 </head>
-                <body><div class="balance-content">${recibo}</div></body>
+                <body>
+                    <div class="botones-impresion">
+                        <button onclick="window.print()">Imprimir</button>
+                        <button onclick="window.close()">Cerrar</button>
+                    </div>
+
+                    <div class="header text-center">
+                        <h2 style="margin: 0; font-size: 14px;">BALANCE ${periodo.toUpperCase()}</h2>
+                        <div class="mb-1">${fechaInicio.toLocaleDateString()} - ${fechaFin.toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div class="border-top">
+                        <div class="mb-1">Total Ventas: $ ${totalVentas.toLocaleString()}</div>
+                        <div class="mb-1">- Efectivo: $ ${totalEfectivo.toLocaleString()}</div>
+                        <div class="mb-1">- Transferencia: $ ${totalTransferencia.toLocaleString()}</div>
+                        <div class="mb-1">- Tarjeta: $ ${totalTarjeta.toLocaleString()}</div>
+                        <div class="mb-1">- Crédito: $ ${totalCredito.toLocaleString()}</div>
+                    </div>
+                    
+                    <div class="border-top">
+                        <div class="mb-1">Total Gastos: $ ${totalGastos.toLocaleString()}</div>
+                    </div>
+                    
+                    <div class="border-top">
+                        <div class="mb-1 total-row">Balance Final: $ ${balanceFinal.toLocaleString()}</div>
+                    </div>
+
+                    <div class="border-top mt-1">
+                        <div class="mb-1">Detalle de Gastos:</div>
+                        ${gastosPeriodo.map(gasto => `
+                            <div class="mb-1">- ${gasto.descripcion}: $ ${gasto.monto.toLocaleString()}</div>
+                        `).join('')}
+                    </div>
+
+                    <div class="border-top mt-1">
+                        <div class="mb-1">Créditos Pendientes:</div>
+                        ${ventasPeriodo.filter(v => (v.metodoPago || '').toLowerCase() === 'crédito').map(credito => `
+                            <div class="mb-1">- ${credito.cliente || 'No especificado'}: $ ${credito.total.toLocaleString()}</div>
+                        `).join('') || '<div class="mb-1">No hay créditos pendientes</div>'}
+                    </div>
+                    
+                    <div class="text-center mt-1">
+                        <div class="border-top">¡Fin del Balance!</div>
+                        <div class="border-top">ToySoft POS</div>
+                    </div>
+                </body>
             </html>
-        `);
-        ventanaImpresion.document.close();
-        ventanaImpresion.focus();
+        `;
+        ventana.document.write(contenido);
+        ventana.document.close();
+        ventana.focus();
         setTimeout(() => {
-            ventanaImpresion.print();
-            ventanaImpresion.close();
+            ventana.print();
+            ventana.close();
         }, 250);
     } catch (error) {
         console.error('Error al imprimir el balance:', error);
         alert('Error al imprimir el balance: ' + error.message);
     }
-} 
+}
+
+// Función para obtener una ventana de impresión
+function obtenerVentanaImpresion() {
+    const ventana = window.open('', '_blank');
+    if (!ventana) {
+        throw new Error('No se pudo abrir la ventana de impresión. Por favor, permite las ventanas emergentes para este sitio.');
+    }
+    return ventana;
+}
+
+// Función para guardar los datos del negocio
+function guardarDatosNegocio() {
+    const datos = {
+        nombre: document.getElementById('nombreNegocio').value,
+        nit: document.getElementById('nitNegocio').value,
+        direccion: document.getElementById('direccionNegocio').value,
+        correo: document.getElementById('correoNegocio').value,
+        telefono: document.getElementById('telefonoNegocio').value
+    };
+    localStorage.setItem('datosNegocio', JSON.stringify(datos));
+    alert('Datos del negocio guardados correctamente');
+}
+
+// Función para cargar los datos del negocio al iniciar
+function cargarDatosNegocio() {
+    const datos = JSON.parse(localStorage.getItem('datosNegocio'));
+    if (datos) {
+        document.getElementById('nombreNegocio').value = datos.nombre || '';
+        document.getElementById('nitNegocio').value = datos.nit || '';
+        document.getElementById('direccionNegocio').value = datos.direccion || '';
+        document.getElementById('correoNegocio').value = datos.correo || '';
+        document.getElementById('telefonoNegocio').value = datos.telefono || '';
+    }
+}
+
+// Llamar a cargarDatosNegocio al cargar la página
+window.addEventListener('DOMContentLoaded', cargarDatosNegocio); 
